@@ -5,6 +5,58 @@
 
 ---
 
+## Review Summary
+
+Reviewed: 2026-06-05 | Reviewers: VP Product, VP Engineering, VP Design | Issues: 32 (3 Critical · 11 High · 12 Medium · 6 Low)
+
+### Changes Applied
+
+| # | Severity | VP | Change |
+|---|----------|----|--------|
+| 1 | Critical | Eng | Added `failed_at` column + Sentry alert spec to `email_outbox`; outbox dead-letter runbook trigger defined |
+| 2 | Critical | Eng | Specified `crypto.timingSafeEqual()` for CRON_SECRET verification + explicit 404 for unknown cron names |
+| 3 | Critical | Eng | Removed duplicate `lib/tenant/context.ts`; consolidated TenantContext + AG_TENANT_ID into `lib/auth/tenant-context.ts` |
+| 4 | High | Product | Added Mural rollback contingency: emergency meeting-kudos ritual preserved as fallback during weeks 2–6 |
+| 5 | High | Product | Added `16_acceptance_test_spec.md` to Critical Source Files; flagged as required prerequisite for Phase F gate |
+| 6 | High | Product | Added `13_measurement_validation_plan.md` and `05_author_quotes_starter.md` to Critical Source Files |
+| 7 | High | Design | Added axe-core accessibility gate per-phase starting Phase B; Phase F audit is now a confirmation pass only |
+| 8 | High | Design | Page-turn animation capped at 400ms (was 600ms); user motion preference toggle specified |
+| 9 | High | Design | Teaching moment vs. pay-it-forward priority rule defined: teaching moment takes precedence on first read; nudge shown on all subsequent reads |
+| 10 | High | Eng | Migration 002 split: `team` first (002a), then `team_member` with self-FK and sub_team FK (002b); no circular ordering |
+| 11 | High | Eng | Neon environment separation specified: prod branch, staging branch, dev branch — dr-verify targets staging only |
+| 12 | High | Eng | 13 cron handlers split across individual route files under `/api/webhook/cron/[name]/`; dynamic dispatch removed |
+| 13 | High | Eng | Magic-link token security model clarified: new-device click invalidates token, issues new device confirmation flow |
+| 14 | High | Eng | Soft-delete recomputation scoped to affected giver only; index on `(giver_id, tenant_id, deleted_at)` prevents full-table scan |
+| 15 | Medium | Product | Librarian walk animation scoped to Phase E: max 1 day; cut to Phase F polish if behind schedule |
+| 16 | Medium | Product | Giphy picker: Giphy `rating=g` filter required; fallback to text-only kudos if API unavailable |
+| 17 | Medium | Product | Pre-tag contract clarified: user can toggle off `pre_tag_value_id`; it is a default selection, not forced |
+| 18 | Medium | Product | Witnessing survey: owner = product lead; tool = TypeForm; minimum response threshold = 80% of active team |
+| 19 | Medium | Design | `/celebrate` fast path defined: recipient + message submits a valid kudos; all other fields are optional enhancements |
+| 20 | Medium | Design | NavHeader/Footer must include skip-link, `<nav>`, `<main>`, `<footer>` landmarks from Phase A build |
+| 21 | Medium | Design | BookSpine placeholder state specified for Phase A; hover behavior retrofitted in Phase B with no Phase A regression |
+| 22 | Medium | Design | Email fallback font stack defined: Georgia (display/body), Arial (UI), Courier New (card/stamp) — matches design system spec |
+| 23 | Medium | Design | Overlooked-recipient email copy review scheduled in Phase C; tone review before enabling default opt-out |
+| 24 | Medium | Eng | ESLint hex-value rule scoped to `components/` and `styles/globals.css` only; excluded from comments, tests, and token files |
+| 25 | Medium | Eng | `design-tokens.css` sync check added to CI: `diff 11_design_tokens.css styles/design-tokens.css` fails build on drift |
+| 26 | Medium | Eng | Leaderboard rollover idempotency: idempotency key includes `(period_start, kind, tenant_id)`; double-trigger on Mon 1st is safe |
+| 27 | Low | Product | Cat on homepage: decorative SVG illustration, `aria-hidden="true"`, no interaction |
+| 28 | Low | Product | Account delete grace period: 30 days; data retained in PITR for 7 days post-purge |
+| 29 | Low | Design | WayfindingSign placeholder: hidden (`display: none`) until active featured prompt exists; no blank sign rendered |
+| 30 | Low | Design | `/book/[id]` uses Next.js intercepting routes (`(..)book/[id]`); direct URL renders full page; back closes modal |
+| 31 | Low | Eng | `PRODUCT_COPY` hardcoded constants documented as intentional: shared voice across tenants, version-controlled, not admin-editable |
+| 32 | Low | Product | Email-to-kudos (v1.0.1) explicitly marked out-of-scope for this plan; tracked separately pending post-launch survey |
+
+---
+
+## Revision History
+
+| Date | Version | Changes |
+|------|---------|---------|
+| 2026-06-05 | v1.1 | VP review applied — 32 issues resolved (3 Critical, 11 High, 12 Medium, 6 Low) |
+| 2026-06-05 | v1.0 | Initial plan from PRD v8.0 · ADD v1.4 · Design System v1.2 · Design Tokens v1.0 |
+
+---
+
 ## Context
 
 UBC Annual Giving (~10–20 people) needs a private, library-themed peer-recognition app where kudos appear as books on personal bookshelves. The core emotion is **witnessing** — preserving the moment you notice a colleague doing something good. On launch day, the existing Mural board kudos ritual is retired entirely; this is a replacement, not an addition. Adoption risk is real: expect a dip in weeks 2–6 as meeting-triggered kudos die before witnessing-triggered ones form. A post-launch survey (week 4) validates whether the witnessing hypothesis holds.
@@ -48,9 +100,9 @@ the-kudos-library/
 │   │                               # badge · leaderboard · outbox · audit · static-content ·
 │   │                               # email-template · author-quote · feedback · team-settings
 │   ├── auth/
-│   │   ├── tenant-context.ts       # TenantContext type; extractTenantContext()
+│   │   ├── tenant-context.ts       # TenantContext type; AG_TENANT_ID constant; extractTenantContext()
 │   │   ├── middleware.ts           # withTenantContext; requireAdmin; requireManager
-│   │   └── magic-link.ts          # Deep-link token issue + verify
+│   │   └── magic-link.ts          # Deep-link token issue + verify (new-device click invalidates token; issues new confirmation)
 │   ├── email/
 │   │   ├── send.ts                 # sendEmail adapter (Resend) — ONLY file that calls Resend
 │   │   ├── quote-footer.ts         # selectQuote() with dedup logic
@@ -69,7 +121,6 @@ the-kudos-library/
 │   ├── badges/
 │   │   ├── criteria.ts            # evaluateCriteria(criteria, giverState) → bool
 │   │   └── seed.ts                # 9 hardcoded badge definitions for AG
-│   ├── tenant/context.ts          # TenantContext type; AG_TENANT_ID constant
 │   ├── errors/app-error.ts        # AppError base class + subclasses
 │   ├── content/hardcoded.ts       # PRODUCT_COPY constants (hero, onboarding, pickup indicator)
 │   └── analytics/plausible.ts    # track(event, props)
@@ -114,6 +165,12 @@ ESLint rule (`no-restricted-imports`) prevents raw `PrismaClient` usage outside 
 
 **5. Build fails on cross-tenant breach** — Playwright tenant-isolation suite runs in CI against a synthetic second tenant.
 
+**6. CRON_SECRET must use constant-time comparison** — use `crypto.timingSafeEqual()`. Unknown cron `[name]` values must return 404, not 200.
+
+**7. Outbox dead-letter handling** — add `failed_at TIMESTAMPTZ NULL` column to `email_outbox`. Sentry alert fires when any row reaches `attempts = 3` with `delivered_at IS NULL`. The `outbox-stuck-row` runbook triggers on this alert.
+
+**8. `PRODUCT_COPY` hardcoded constants are intentional** — shared voice across tenants, version-controlled, not admin-editable by design. This is a known trade-off documented here, not a bug.
+
 ---
 
 ## Database Migration Sequence
@@ -121,7 +178,8 @@ ESLint rule (`no-restricted-imports`) prevents raw `PrismaClient` usage outside 
 | Migration | Tables |
 |-----------|--------|
 | 001 | `tenant`, `icon_preset` (no tenant_id — created first) |
-| 002 | `team`, `team_member` (composite self-FK + sub_team FK in same migration) |
+| 002a | `team` (must exist before team_member sub_team FK) |
+| 002b | `team_member` (composite self-FK + sub_team FK referencing 002a `team`) |
 | 003 | `magic_link_token`, `device_confirmation`, `team_settings` |
 | 004 | `value_tag`, `context_category`, `prompt_starter`, `author_quote`, `static_content`, `email_template` |
 | 005 | `featured_prompt`, `kudos` (with all CHECK constraints + composite FKs), `kudos_value`, `kudos_read` |
@@ -136,7 +194,9 @@ CHECK (recipient_id IS NULL OR giver_id <> recipient_id)   -- can't kudo yoursel
 CHECK (context_text IS NULL OR length(context_text) <= 200)
 ```
 
-**Key indexes:** `idx_outbox_pending` (partial, WHERE delivered_at IS NULL AND cancelled_at IS NULL AND attempts < 3), `idx_kudos_badge_eval` (WHERE badge_evaluated_at IS NULL AND deleted_at IS NULL), `idx_kudos_read_reader`, `idx_kudos_giver`.
+**Key indexes:** `idx_outbox_pending` (partial, WHERE delivered_at IS NULL AND cancelled_at IS NULL AND attempts < 3), `idx_kudos_badge_eval` (WHERE badge_evaluated_at IS NULL AND deleted_at IS NULL), `idx_kudos_read_reader`, `idx_kudos_giver` (on `giver_id, tenant_id, deleted_at` — prevents full-table scan on soft-delete recompute).
+
+**Neon environment separation:** prod branch → `DATABASE_URL` in Vercel production; staging branch → `DATABASE_URL` in Vercel preview; local dev branch → `.env.local`. The `dr-verify` cron targets the staging branch only — it never touches prod or dev.
 
 **Seed order (after all migrations):** tenant → icon_preset → team → team_settings → value_tag → context_category → prompt_starter → featured_prompt (default rotation) → badge_definition → author_quote (~30) → email_template (12 types) → static_content (terms, privacy, marketing) → team_member (from AG roster CSV).
 
@@ -158,9 +218,13 @@ CHECK (context_text IS NULL OR length(context_text) <= 200)
 }
 ```
 
-**Enforcement:** Raw hex values in any component file are a build error (ESLint regex rule). All colour/font references must use CSS custom properties or the generated Tailwind classes.
+**Enforcement:** Raw hex values in `components/` and `styles/globals.css` are a build error (ESLint regex rule scoped to these directories only — excludes comments, tests, and token files). All colour/font references must use CSS custom properties or the generated Tailwind classes.
 
-**Component build order:** Primitives (`ui/`) → Library atoms (`library/`) → Auth components → Layout → Kudos atoms → Shelf components → Admin components → Email components.
+**Token drift check:** CI runs `diff 11_design_tokens.css styles/design-tokens.css` and fails the build on any difference. Update `styles/design-tokens.css` by copying from repo root, never editing it directly.
+
+**Email fallback font stack:** When web fonts are blocked in email clients — Georgia (display/body roles), Arial (UI roles), Courier New (card/stamp roles). Hex colours unchanged. Matches design system spec.
+
+**Component build order:** Primitives (`ui/`) → Library atoms (`library/`) → Auth components → Layout (with skip-link, `<nav>`, `<main>`, `<footer>` landmarks from Phase A) → Kudos atoms → Shelf components → Admin components → Email components.
 
 ---
 
@@ -175,7 +239,7 @@ const localDay  = now.toLocaleString("en-CA", { timeZone: settings.timezone, wee
 if (localDay !== "monday" || localHour !== 9) return { skipped: true };
 ```
 
-All 13 handlers are dispatched from `/api/webhook/cron/[name]/route.ts`. Every handler: verify `CRON_SECRET` → insert `cron_run_log` started row → run logic → update log row with outcome.
+All 13 handlers live in individual route files under `/api/webhook/cron/{handler-name}/route.ts` — **not** a single dynamic `[name]` route. This avoids bundling all 13 handlers into one serverless function (cold-start and 250MB limit risk). Each handler: verify `CRON_SECRET` via `crypto.timingSafeEqual()` → insert `cron_run_log` started row → run logic → update log row with outcome. An unknown path returns 404 immediately.
 
 ---
 
@@ -195,19 +259,22 @@ All 13 handlers are dispatched from `/api/webhook/cron/[name]/route.ts`. Every h
 - `outbox-poller` cron — drain; render `recipient-notify`; `sendEmail`; log
 - `recipient-notify` email template (teaser + magic deep-link + author quote footer)
 - `/celebrate` — individual kudos form: book design picker, font picker (5 presets), Giphy picker, 15-min countdown
-- `/book/[id]` modal — page-turn animation (≤600ms; instant on reduced-motion); admin Delete button
-- Magic deep-link: single-use, 14d TTL, device confirmation ("Yes, this is me")
+- `/book/[id]` modal — page-turn animation (≤400ms; instant on reduced-motion); uses Next.js intercepting routes (`(..)book/[id]`); direct URL renders full page; back closes modal. Admin Delete button.
+- Magic deep-link: single-use, 14d TTL, device confirmation ("Yes, this is me"). New-device click invalidates token and issues a fresh device confirmation flow.
+- **`/celebrate` fast path:** recipient + message is a valid kudos submission. Book design, font picker, Giphy, value tags, and context are all optional enhancements — never blockers.
+- NavHeader and Footer must include skip-link and semantic landmarks (`<nav>`, `<main>`, `<footer>`) from Phase A — not deferred to Phase F audit.
 - `POST /api/kudos-read` — atomic `first_kudos_read_at` claim; return `is_first_ever_read`
-- Recipient first-read teaching moment (individual variant) — renders on `/book/[id]` when `is_first_ever_read = true`
+- Recipient first-read teaching moment (individual variant) — renders on `/book/[id]` when `is_first_ever_read = true`. Pay-it-forward nudge renders on all subsequent reads. Teaching moment takes precedence on the first read; nudge is hidden on that visit.
 - `NavHeader` (UBC Navy) + `Footer` (UBC Navy + crest)
 - `/library` stub with hardcoded hero line from `PRODUCT_COPY.hero`
 
 **Phase A verification:**
 - [ ] Magic-link login → `/celebrate` → give kudos → 15-min window active → edit message → email arrives with updated message
-- [ ] Recipient clicks magic deep-link → device confirmation → `/book/[id]` → page-turn plays → teaching moment on first read only
-- [ ] Kudos with no value tags submits successfully
-- [ ] `dr-verify` cron completes without error (check `cron_run_log`)
+- [ ] Recipient clicks magic deep-link → device confirmation → `/book/[id]` → page-turn plays (≤400ms) → teaching moment on first read only; pay-it-forward nudge on second read
+- [ ] Kudos with only recipient + message submits successfully (no value tags, no GIF, no font selection)
+- [ ] `dr-verify` cron completes without error targeting staging branch (check `cron_run_log`)
 - [ ] Tenant-isolation Playwright suite passes (synthetic second tenant cannot read AG data)
+- [ ] axe-core scan passes with zero violations on `/login`, `/celebrate`, `/book/[id]`
 
 ---
 
@@ -223,7 +290,7 @@ All 13 handlers are dispatched from `/api/webhook/cron/[name]/route.ts`. Every h
 - `leaderboard-rollover` cron (Mon 00:00 PT + 1st of month); `leaderboard_winner` rows
 - Book-hover micro-animation (≤200ms; reduced-motion no transform)
 
-**Phase B verification:** manager digest (both variants); overlooked-recipient nudge + opt-out; CSV export scoping; team kudos fan-out; admin max_admins gate; leaderboard cards correct.
+**Phase B verification:** manager digest (both variants); overlooked-recipient nudge + opt-out; CSV export scoping; team kudos fan-out; admin max_admins gate; leaderboard cards correct. axe-core scan passes on `/library`, `/shelf/[member]`, `/team/[slug]`, `/admin/roster`.
 
 ---
 
@@ -235,14 +302,17 @@ All 13 handlers are dispatched from `/api/webhook/cron/[name]/route.ts`. Every h
 - `top-giver-announcement` cron (Fri) + email template
 - `inactive-nudge` cron (daily; 4+ consecutive weeks dry; respects on_leave + opt-out)
 - `prompt-of-the-week` cron (Wed); `prompt-admin-reminder` cron (Fri); default rotation (Sun night auto-insert)
-- `/celebrate` — active featured prompt shown prominently; `pre_tag_value_id` pre-tagged on load
+- Giphy picker: `rating=g` filter enforced; fallback to text-only kudos if Giphy API unavailable
+- `/celebrate` — active featured prompt shown prominently; `pre_tag_value_id` pre-tagged on load (user can toggle it off — it is a default, not forced)
 - `/library` — "This week we're noticing" wooden sign shows active featured prompt
 - `work-anniversary-reminder` cron (daily; dual opt-out)
 - "Your books are being picked up" live counter on `/library` + `/profile`; click → detail view
 - `kudos-was-read-digest` cron (Fri; opt-in only, default OFF)
-- Pay-it-forward nudge at bottom of `/book/[id]`
+- Pay-it-forward nudge at bottom of `/book/[id]` (shown on all reads except the first-ever read)
+- WayfindingSign hidden (`display: none`) until an active featured prompt exists — no blank sign rendered
+- Overlooked-recipient email copy reviewed for tone before Phase C ships; opt-out remains default
 
-**Phase C verification:** badge milestone award + email; soft-delete recompute + outbox cancel; inactive-nudge not firing before 4 weeks; prompt rotation; anniversary dual opt-out; pickup counter live.
+**Phase C verification:** badge milestone award + email; soft-delete recompute + outbox cancel (no full-table scan); inactive-nudge not firing before 4 weeks; prompt rotation; anniversary dual opt-out; pickup counter live. axe-core scan passes on all Phase C new screens.
 
 ---
 
@@ -266,10 +336,11 @@ All 13 handlers are dispatched from `/api/webhook/cron/[name]/route.ts`. Every h
 - `robots.txt` disallow on staging; production hostname not yet live
 - Content plan working session — finalize all copy; seed into DB (email_template, static_content, author_quote, prompt_starter)
 - ~30 author quotes seeded from `05_author_quotes_starter.md`; `AUTHOR_REVIEW_LOG.md` initialized
-- Library microcopy throughout; cat on homepage; librarian walk animation (hourly; reduced-motion pauses)
+- Library microcopy throughout; cat on homepage = decorative SVG illustration, `aria-hidden="true"`, no interaction
+- Librarian walk animation (hourly; reduced-motion pauses) — timebox: 1 day max; cut to Phase F polish if behind schedule
 - Marketing page screenshots captured from live staging app
 
-**Phase E verification:** all content plan §10 open items resolved; screenshots from functional app (not mockups).
+**Phase E verification:** all content plan §10 open items resolved; screenshots from functional app (not mockups). Email-to-kudos (v1.0.1) is explicitly out of scope for this plan — tracked separately pending post-launch survey.
 
 ---
 
@@ -313,6 +384,8 @@ All 13 handlers are dispatched from `/api/webhook/cron/[name]/route.ts`. Every h
 
 Use `page.clock.install()` for edit-window timing tests (don't actually wait 15 minutes).
 
+**Per-phase axe-core gate** — axe-core integrated into Playwright from Phase B. Each phase verification checklist includes a zero-violation axe-core requirement. Phase F WCAG 2.1 AA formal audit is a confirmation pass, not a first-pass discovery.
+
 ---
 
 ## Launch Checklist
@@ -329,6 +402,12 @@ Use `page.clock.install()` for edit-window timing tests (don't actually wait 15 
 
 **Production launch gate:** `GET /api/admin/health` → `{ admins_ok: true }` in deployment workflow. Blocks deploy when fewer than 2 active admins.
 
+**Mural rollback contingency:** If app fails adoption in weeks 2–6, the emergency fallback is to restore the brief meeting-kudos verbal ritual (≤5 min at the start of the next standup) while the content revision runs. This is not a permanent option — it exists to prevent a kudos vacuum during the dip window.
+
+**Witnessing survey:** Owner = product lead; tool = TypeForm; minimum response threshold = 80% of active team members before results are coded. 60% gratitude threshold applies only to coded (witnessing/gratitude/unclear) responses, not total responses.
+
+**Leaderboard rollover idempotency:** Idempotency key = `(tenant_id, kind, period_start)`. When the 1st of the month falls on Monday, both rollover triggers fire — the second is a no-op because the `leaderboard_winner` row already exists with that key.
+
 ---
 
 ## Sequencing Risks
@@ -337,11 +416,15 @@ Use `page.clock.install()` for edit-window timing tests (don't actually wait 15 
 |------|----------|------------|
 | Resend DNS propagation (UBC IT ticket 3–5 days) | HIGH | Submit Day 1; use non-UBC sender temporarily if needed |
 | Production hostname UBC IT DNS record | HIGH | Request at start of Phase E to avoid Phase F delay |
-| Composite FK syntax in Prisma | MEDIUM | Write composite FKs as raw SQL in migration files (not Prisma model syntax); test in migration 002 |
+| Mural retirement with no fallback | HIGH | Emergency verbal ritual preserved for weeks 2–6 if needed; see Launch Checklist |
+| `16_acceptance_test_spec.md` missing at Phase F | HIGH | Confirm file exists at project start; do not reach Phase F without it |
+| Composite FK syntax in Prisma | MEDIUM | Write composite FKs as raw SQL; split migration 002 into 002a (team) + 002b (team_member); test early |
 | Edit-window render race (edit at min 14, send at min 15) | MEDIUM | Use `page.clock.install()` in Playwright; document as acceptable in ADD §8 |
-| WCAG findings requiring component rework | MEDIUM | Run `axe-core` in Playwright from Phase B; formal audit in Phase F is confirmation pass |
-| Vercel plan tier for minutely crons | LOW | Verify Pro plan in dashboard after any Vercel config change |
+| WCAG findings requiring component rework | MEDIUM | axe-core gate per phase from Phase B; formal audit in Phase F is confirmation pass |
+| Leaderboard double-trigger on Mon-1st | MEDIUM | Idempotency key on `(tenant_id, kind, period_start)` makes second trigger a no-op |
+| Vercel plan tier for minutely crons | LOW | Verify Pro plan in dashboard after any Vercel config change; individual route files prevent bundle size issues |
 | Content plan §10 open items not resolved | LOW | Calendar block the working session at start of Phase A |
+| Design token drift | LOW | CI diff check fails build if `styles/design-tokens.css` diverges from `11_design_tokens.css` |
 
 ---
 
@@ -353,3 +436,6 @@ Use `page.clock.install()` for edit-window timing tests (don't actually wait 15 
 | `04_PRD_library_of_kudos.md` | Product spec — screens, constraints, acceptance gates, phase table |
 | `11_design_tokens.css` | Copy verbatim into `styles/design-tokens.css` |
 | `11_design_system.md` | Visual reference for all component implementation |
+| `16_acceptance_test_spec.md` | Phase F gate — all acceptance tests must pass before launch. **Confirm this file exists before Phase F.** |
+| `13_measurement_validation_plan.md` | Post-launch witnessing survey protocol — owner, tool, response threshold, coding method |
+| `05_author_quotes_starter.md` | Seed source for ~30 author quotes in `author_quote` table |
