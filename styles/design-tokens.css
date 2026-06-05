@@ -1,0 +1,199 @@
+/* ============================================================
+   THE KUDOS LIBRARY — DESIGN TOKENS v1.0
+   Source of truth: 11_design_system.md (same folder)
+   Rule for Claude Code: components use tokens only.
+   Raw hex in a component is a build error.
+
+   FONT LOADING — put this in <head> (or the Next.js equivalent
+   via next/font/google, same families and weights):
+
+   <link rel="preconnect" href="https://fonts.googleapis.com">
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=Special+Elite&family=Open+Sans:wght@400;600&family=Caveat:wght@400;600&display=swap" rel="stylesheet">
+
+   Tailwind v4: these variables can be dropped into an @theme
+   block unchanged.
+   ============================================================ */
+
+:root {
+
+  /* ----------------------------------------------------------
+     INSTITUTIONAL LAYER — locked. Inherited from UBC + FORWARD.
+     Never add colours here. Swapping this block re-skins the
+     product for a non-UBC org (future hook — do not build).
+     ---------------------------------------------------------- */
+  --inst-navy:          #002145;  /* UBC Blue, PMS 282 */
+  --inst-link:          #0055B7;  /* Royal Blue, PMS 2935 — links, focus rings */
+  --inst-gold:          #E69400;  /* FORWARD Gold, ≈PMS 144 — CTA fill, ink text only */
+  --inst-gold-deep:     #C86700;  /* Burnished Gold, ≈PMS 717 — CTA hover/pressed */
+  --inst-gold-heritage: #A89565;  /* UBC Gold, PMS 8383 — decorative only, never text */
+  --inst-white:         #FFFFFF;
+
+  /* ----------------------------------------------------------
+     LIBRARY LAYER — surfaces & scene
+     ---------------------------------------------------------- */
+  --lib-cream:      #F5EEDD;  /* default page/panel background */
+  --lib-parchment:  #EAE0C8;  /* card stock, modals, aged paper */
+  --lib-ink:        #343433;  /* body text (UBC DAE template colour) — never #000 */
+  --lib-daylight:   #F3C96B;  /* window light, glints, primary button hover */
+
+  /* Wood ramp — sampled from Inspiration/l66220250115093010.webp
+     (the v1 layout anchor). Illustration fills, not brand colours.
+     Gilt edges/hardware use --inst-gold-heritage (#A89565). */
+  --wood-espresso:    #2B231D;  /* shelf interiors, deepest shadow */
+  --wood-walnut-deep: #4B352A;  /* cabinet frames, uprights; UI walnut accents */
+  --wood-walnut:      #5E4836;  /* primary shelf/cabinet wood */
+  --wood-smoked:      #695B4C;  /* greyed background panelling */
+  --wood-cabinet:     #926E54;  /* lit cabinet faces */
+  --wood-burl:        #955735;  /* desk burl, warm red accents */
+  --wood-caramel:     #D3B08E;  /* sunlit desktop planes */
+
+  /* ----------------------------------------------------------
+     BOOK SPINE PALETTE — 12. Spines 1–6 inherited (UBC/FORWARD),
+     7–12 minted for the library.
+     ---------------------------------------------------------- */
+  --spine-navy:      #002145;  /*  1 · UBC primary      */
+  --spine-royal:     #0055B7;  /*  2 · UBC secondary    */
+  --spine-heritage:  #A89565;  /*  3 · UBC gold         */
+  --spine-gold:      #E69400;  /*  4 · FORWARD          */
+  --spine-burnished: #C86700;  /*  5 · FORWARD          */
+  --spine-ink:       #343433;  /*  6 · UBC DAE template */
+  --spine-oxblood:   #76232F;  /*  7 · ≈PMS 188  */
+  --spine-green:     #154734;  /*  8 · ≈PMS 3435 */
+  --spine-moss:      #6E7F5C;  /*  9 · ≈PMS 5763 */
+  --spine-brick:     #9C4A2F;  /* 10 · ≈PMS 7587 */
+  --spine-leather:   #693F23;  /* 11 · ≈PMS 469  */
+  --spine-vellum:    #EAE0C8;  /* 12 · ≈PMS 7501 */
+
+  /* Spine foil/ornament: light foil on dark spines, dark on light */
+  --foil-light: #EAE0C8;   /* on navy, royal, ink, oxblood, green, moss, brick, leather */
+  --foil-dark:  #343433;   /* on heritage, gold, burnished, vellum */
+
+  /* ----------------------------------------------------------
+     FUNCTIONAL STATES — mapped from palette, nothing minted
+     ---------------------------------------------------------- */
+  --state-success: #154734;  /* Library Green */
+  --state-error:   #76232F;  /* Oxblood */
+  --state-warning: #C86700;  /* Burnished Gold */
+  --state-info:    #0055B7;  /* Royal Blue */
+
+  /* ----------------------------------------------------------
+     TYPOGRAPHY
+     ---------------------------------------------------------- */
+  --font-display:     'EB Garamond', Georgia, 'Times New Roman', serif;
+  --font-body:        'Crimson Pro', Georgia, serif;
+  --font-card:        'Special Elite', 'Courier New', monospace;
+  --font-ui:          'Open Sans', Arial, sans-serif;   /* UBC sanctioned web font */
+  --font-handwritten: 'Caveat', cursive;                /* kudos picker only */
+
+  /* Type scale — desktop only (1280px+). Two contexts:
+     mk- = marketing page (/), app- = in-product.
+     Garamond owns levels 1–3; Open Sans owns level 4 down.
+     Eyebrow/h4 tokens need letter-spacing + uppercase applied
+     separately (font shorthand can't carry them). */
+
+  /* Marketing page */
+  --text-mk-hero:    600 56px/64px var(--font-display);
+  --text-mk-lede:    italic 400 21px/34px var(--font-body);
+  --text-mk-h2:      600 36px/44px var(--font-display);
+  --text-mk-h3:      600 24px/32px var(--font-display);
+  --text-mk-eyebrow: 600 12px/16px var(--font-ui);     /* +0.08em, uppercase */
+  --text-mk-body:    400 18px/30px var(--font-body);
+  --text-mk-caption: 400 14px/20px var(--font-ui);
+
+  /* In-product */
+  --text-app-title:   600 32px/40px var(--font-display);
+  --text-app-h2:      600 24px/32px var(--font-display);
+  --text-app-h3:      600 19px/26px var(--font-display);
+  --text-app-h4:      600 13px/18px var(--font-ui);    /* +0.06em, uppercase */
+  --text-app-body:    400 17px/28px var(--font-body);  /* never below 16 */
+  --text-app-body-sm: 400 15px/24px var(--font-body);
+  --text-app-ui:      400 14px/20px var(--font-ui);
+  --text-app-ui-sm:   400 12px/16px var(--font-ui);
+  --text-app-card:    400 15px/24px var(--font-card);
+  --text-app-card-sm: 400 12px/18px var(--font-card);
+
+  /* ----------------------------------------------------------
+     BUTTONS (see 11_design_system.md §5.1)
+     Primary hover BRIGHTENS to daylight (never darken to
+     burnished — #C86700 fails contrast with any text).
+     Bookplate button: library-card/book contexts only.
+     ---------------------------------------------------------- */
+  --btn-primary-bg:        #E69400;   /* Forward Gold */
+  --btn-primary-text:      #343433;   /* ink — 5.1:1 AA */
+  --btn-primary-hover-bg:  #F3C96B;   /* Daylight Gold — 7.9:1 AAA */
+  --btn-primary-radius:    3px;
+  --btn-secondary-border:  #4B352A;   /* deep walnut, 1px */
+  --btn-secondary-text:    #002145;   /* navy — 13.9:1 AAA */
+  --btn-secondary-hover-bg:   #E69400;
+  --btn-secondary-hover-text: #343433;
+  --btn-bookplate-bg:      #EAE0C8;   /* parchment */
+  --btn-bookplate-text:    #76232F;   /* oxblood — 7.8:1 AAA */
+  --btn-bookplate-rule:    #76232F;   /* 1px top+bottom only, radius 0 */
+  --btn-danger-bg:         #76232F;   /* oxblood fill, cream text — 8.9:1 AAA */
+  --btn-danger-text:       #F5EEDD;
+  --btn-focus-ring:        #0055B7;   /* 2px royal blue */
+
+  /* ----------------------------------------------------------
+     APP CHROME — navy bookends (see §5.3)
+     Header + footer are full UBC Navy; chrome stays flat,
+     no texture, no crest in header.
+     ---------------------------------------------------------- */
+  --header-bg:         #002145;   /* UBC Blue */
+  --header-text:       #F5EEDD;   /* cream — 13.9:1 AAA */
+  --header-link-hover: #F3C96B;   /* daylight gold */
+
+  /* ----------------------------------------------------------
+     CALLOUTS — colour rotation (see §5.4)
+     Washes are existing colours at low opacity over cream —
+     no new hexes. Anatomy: wash bg + 3px left rule in accent
+     + accent heading + ink body. Flat. Brown ≤ 1/3 of callout
+     moments per screen.
+     ---------------------------------------------------------- */
+  --wash-featured:   rgba(243, 201, 107, 0.18);  /* daylight gold */
+  --wash-success:    rgba(21, 71, 52, 0.07);     /* library green */
+  --wash-info:       rgba(0, 33, 69, 0.06);      /* ubc navy */
+  --wash-alert:      rgba(118, 35, 47, 0.06);    /* oxblood */
+  --accent-featured: #A89565;   /* heritage gold rule; navy heading */
+  --accent-success:  #154734;
+  --accent-info:     #002145;
+  --accent-alert:    #76232F;
+
+  /* ----------------------------------------------------------
+     TEXTURE (see §2.7) — library-layer surfaces only.
+     Overlays ≤8% opacity (≤4% under text). One material per
+     surface. Institutional chrome stays flat.
+     ---------------------------------------------------------- */
+  --texture-max-opacity:      0.08;
+  --texture-max-under-text:   0.04;
+
+  /* ----------------------------------------------------------
+     LIBRARY CARD COMPONENT
+     ---------------------------------------------------------- */
+  --card-bg:          var(--lib-parchment);
+  --card-border:      rgba(75, 53, 42, 0.40);    /* deep walnut @ 40% */
+  --card-rule:        rgba(75, 53, 42, 0.30);    /* lined rows @ 30% */
+  --card-header-rule: #76232F;                   /* oxblood double rule */
+  --card-stamp:       rgba(118, 35, 47, 0.85);   /* oxblood stamp @ 85% */
+  --card-radius:      2px;                        /* cards are cut square */
+  --card-shadow:      0 1px 3px rgba(52, 52, 51, 0.18);
+
+  /* ----------------------------------------------------------
+     KUDOS FONT PICKER (PRD font_choice preset keys)
+     classic | elegant | typewriter | handwritten | modern
+     ---------------------------------------------------------- */
+  --kudos-font-classic:     var(--font-body);
+  --kudos-font-elegant:     var(--font-display);  /* render italic */
+  --kudos-font-typewriter:  var(--font-card);
+  --kudos-font-handwritten: var(--font-handwritten);
+  --kudos-font-modern:      var(--font-ui);
+}
+
+/* ------------------------------------------------------------
+   CONTRAST CONTRACT (verified — see 11_design_system.md §2.5)
+   ALLOWED text/bg: ink-on-cream (10.8) · navy-on-cream (13.9) ·
+   link-on-cream (6.1) · ink-on-gold CTA (5.1) · white-on-navy/
+   oxblood/green (16.1/10.2/10.6) · cream-on-walnut (7.8)
+   FORBIDDEN: any gold as text on cream · navy-on-moss below 24px ·
+   pure #FFF page backgrounds · pure #000 text
+   ------------------------------------------------------------ */

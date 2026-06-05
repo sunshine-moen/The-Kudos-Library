@@ -1,0 +1,72 @@
+@import "tailwindcss";
+@import "./design-tokens.css";
+
+@theme {
+  /* Institutional */
+  --color-inst-navy: var(--inst-navy);
+  --color-inst-link: var(--inst-link);
+  --color-inst-gold: var(--inst-gold);
+  --color-inst-gold-deep: var(--inst-gold-deep);
+  --color-inst-gold-heritage: var(--inst-gold-heritage);
+  --color-inst-white: var(--inst-white);
+
+  /* Library */
+  --color-lib-cream: var(--lib-cream);
+  --color-lib-parchment: var(--lib-parchment);
+  --color-lib-ink: var(--lib-ink);
+  --color-lib-daylight: var(--lib-daylight);
+
+  /* Wood */
+  --color-wood-espresso: var(--wood-espresso);
+  --color-wood-walnut-deep: var(--wood-walnut-deep);
+  --color-wood-walnut: var(--wood-walnut);
+  --color-wood-smoked: var(--wood-smoked);
+  --color-wood-cabinet: var(--wood-cabinet);
+  --color-wood-burl: var(--wood-burl);
+  --color-wood-caramel: var(--wood-caramel);
+
+  /* Spines */
+  --color-spine-navy: var(--spine-navy);
+  --color-spine-royal: var(--spine-royal);
+  --color-spine-heritage: var(--spine-heritage);
+  --color-spine-gold: var(--spine-gold);
+  --color-spine-burnished: var(--spine-burnished);
+  --color-spine-ink: var(--spine-ink);
+  --color-spine-oxblood: var(--spine-oxblood);
+  --color-spine-green: var(--spine-green);
+  --color-spine-moss: var(--spine-moss);
+  --color-spine-brick: var(--spine-brick);
+  --color-spine-leather: var(--spine-leather);
+  --color-spine-vellum: var(--spine-vellum);
+
+  /* States */
+  --color-state-success: var(--state-success);
+  --color-state-error: var(--state-error);
+  --color-state-warning: var(--state-warning);
+  --color-state-info: var(--state-info);
+
+  /* Fonts */
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-card: var(--font-card);
+  --font-ui: var(--font-ui);
+  --font-handwritten: var(--font-handwritten);
+}
+
+@layer base {
+  html {
+    background-color: var(--lib-cream);
+    color: var(--lib-ink);
+    font-family: var(--font-body);
+  }
+
+  body {
+    min-height: 100dvh;
+  }
+
+  /* Focus ring — royal blue per design system §5 */
+  :focus-visible {
+    outline: 2px solid var(--inst-link);
+    outline-offset: 2px;
+  }
+}

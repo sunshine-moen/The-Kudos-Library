@@ -1,0 +1,8 @@
+email,first_name,last_name,role,department,job_title,sub_team
+admin@ag.example.com,Alex,Grant,admin,Operations,Library Admin,OPS
+manager@ag.example.com,Morgan,Bailey,manager,Branch Services,Branch Manager,BB
+alice@ag.example.com,Alice,Chen,user,Information Foundations,Librarian,IF
+bob@ag.example.com,Bob,Okafor,user,Branch Services,Library Technician,BB
+carol@ag.example.com,Carol,Singh,user,Strategic Alignment,Program Coordinator,SA
+david@ag.example.com,David,Novak,user,Information Foundations,Metadata Specialist,IF
+emma@ag.example.com,Emma,Tran,user,Operations,Systems Librarian,OPS

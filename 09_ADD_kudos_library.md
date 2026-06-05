@@ -1,7 +1,7 @@
 # Architecture Document — The Kudos Library
 
-**Status:** Draft complete (all 15 sections + foundational questions). Rev 1.4 applies the final critic batch (see Change Log at end). **Ready for ADR extraction and implementation handoff.** Pending: ADR review with David's session, integration with implementation plan.
-**Last updated:** 2026-06-02 (rev 1.4 — see Change Log at end).
+**Status:** Draft complete (all 15 sections + foundational questions). Rev 1.5 applies implementation-plan reconciliation (see Change Log at end). **Ready for ADR extraction and implementation handoff.** Pending: ADR review with David's session, integration with implementation plan.
+**Last updated:** 2026-06-05 (rev 1.5 — see Change Log at end).
 **Companion docs:** `04_PRD_library_of_kudos.md` (the PRD this document implements). `07_v2_strategy.md` (the commercial v2 vision; informs v1 architectural choices). `03_design_intent.md` (visual system).
 **Reading order:** read this AFTER the PRD. The PRD answers *what* and *why*; this document answers *how the system works internally* — structure, interfaces, runtime behavior.
 
@@ -75,25 +75,34 @@ The full system runs in a single Vercel project plus a Neon-managed Postgres. No
 │  Vercel Cron       │
 │  (platform-managed)│
 │                    │
-│  Triggers:         │
-│  - manager digest  │
-│    (per-cadence)   │
-│  - prompt-of-week  │
-│    (weekly Wed)    │
-│  - admin reminder  │
-│    (weekly Fri)    │
-│  - inactive nudge  │
-│    (per-threshold) │
-│  - overlooked      │
-│    (weekly)        │
-│  - anniversaries   │
-│    (daily)         │
-│  - top-giver       │
-│    (weekly)        │
-│  - leaderboard     │
-│    rollover (Mon)  │
+│  Triggers (14):    │
 │  - outbox poller   │
 │    (1-min interval)│
+│  - badge evaluator │
+│    (1-min interval)│
+│  - manager digest  │
+│    (hourly; gated) │
+│  - prompt-of-week  │
+│    (hourly; gated) │
+│  - admin reminder  │
+│    (hourly; gated) │
+│  - inactive nudge  │
+│    (daily; gated)  │
+│  - overlooked      │
+│    (hourly; gated) │
+│  - anniversaries   │
+│    (hourly; gated) │
+│  - top-giver       │
+│    (hourly; gated) │
+│  - kudos-was-read  │
+│    digest (hourly; │
+│    gated to Fri PM)│
+│  - leaderboard     │
+│    rollover (hourly│
+│    gated to Mon 0) │
+│  - account-deletion│
+│    processor       │
+│    (daily)         │
 │  - audit purge     │
 │    (nightly)       │
 │  - DR verify       │
@@ -327,6 +336,7 @@ Postgres via Prisma. All timestamps `timestamptz`. All team-scoped tables carry 
 | on_leave_from, on_leave_until | timestamptz | nullable |
 | tos_accepted_at | timestamptz | nullable until first accept |
 | first_kudos_read_at | timestamptz | nullable. Set the first time this team_member reads any kudos. Drives the recipient onboarding teaching moment (rendered ONLY on the read that flips this column from NULL → NOW()). Atomic claim via conditional UPDATE: `UPDATE team_member SET first_kudos_read_at = NOW() WHERE id = $reader AND tenant_id = $tenant AND first_kudos_read_at IS NULL RETURNING id`. Race-free at any isolation level — Postgres serializes UPDATEs to the same row. |
+| pending_deletion_at | timestamptz | nullable. Set when user initiates account deletion via `/profile`. Grace period: 30 days. Cancellation: "Restore account" link in the grace-period email sets back to NULL. Processed by `account-deletion-processor` cron (daily): for any row WHERE `pending_deletion_at < NOW() - INTERVAL '30 days'`, execute hard-delete cascade. Indexed: `idx_team_member_pending_deletion (pending_deletion_at) WHERE pending_deletion_at IS NOT NULL` drives the cron's lookup. |
 | email_settings | jsonb | per-user opt-out toggles (each independent) |
 | created_at, updated_at | timestamptz | auto |
 
@@ -430,13 +440,13 @@ id (PK), tenant_id, label, starter_text, is_active, display_order, created_at, u
 |---|---|---|
 | id | uuid | PK |
 | tenant_id | uuid | FK → tenant.id |
-| week_start_date | date | Monday of the target week (in tenant's timezone) |
+| week_start_date | date | **Nullable.** Monday of the target week (in tenant's timezone) for scheduled prompts; NULL for default-rotation prompts (no specific week). |
 | prompt_text | text | The prompt itself; witnessing-framed |
 | pre_tag_value_id | uuid | nullable FK → value_tag.id; if set, kudos submitted while this prompt is active pre-tag this value on /celebrate |
 | scheduled_by | uuid | FK → team_member.id; admin who scheduled, OR null if from default rotation |
 | is_default_rotation | boolean | true for system-seeded fallback prompts (used when no admin-scheduled prompt exists for a given week) |
 | created_at, updated_at | timestamptz | auto |
-| UNIQUE | (tenant_id, week_start_date) | one prompt per tenant per week |
+| **Partial UNIQUE index** | `(tenant_id, week_start_date) WHERE week_start_date IS NOT NULL` | One scheduled prompt per tenant per week; default-rotation prompts (NULL week_start_date) are unconstrained. |
 
 Composite FKs: `(scheduled_by, tenant_id) → (team_member.id, tenant_id)`; `(pre_tag_value_id, tenant_id) → (value_tag.id, tenant_id)`.
 
@@ -1716,6 +1726,7 @@ When you've reviewed this batch and we've resolved any pushback, I'll move on.
 | Rev | Date | Summary |
 |---|---|---|
 | 1.0 | 2026-06-02 | Initial draft. All 15 sections + foundational questions. Authored in three batches (Batch 1: §1–§4 + foundational; Batch 2: §5–§9; Batch 3: §10–§15). |
+| 1.5 | 2026-06-05 | Implementation-plan reconciliation (driven by `17_implementation_plan.md` v1.2 critic batch). **Schema changes:** §4 Schema definitions — `featured_prompt.week_start_date` is now nullable (default-rotation prompts have NULL); UNIQUE constraint replaced with partial UNIQUE index `(tenant_id, week_start_date) WHERE week_start_date IS NOT NULL` so default-rotation prompts are unconstrained. Without this, the seed of 10 default-rotation prompts would fail at migration time. §4 Schema — `team_member` adds `pending_deletion_at` column to support the 30-day account-deletion grace period (specified end-to-end in implementation plan Phase D: column → `account-deletion-processor` cron → "Restore account" cancellation path). **Topology fix:** §2 cron list updated from 11 triggers to 14 — added `badge-evaluator` (was missing — runs every 60s alongside outbox-poller per §5), `kudos-was-read-digest` (was missing — Friday-PM digest per `15_decision_log.md`), and `account-deletion-processor` (new per implementation plan v1.2). All other crons relabeled to reflect the hourly-self-gate pattern documented in §12. No other behavioral changes; pure reconciliation. |
 | 1.4 | 2026-06-02 | Final critic batch. **Bug:** §5 Flow 2's `kudos_read` INSERT and `team_member.first_kudos_read_at` UPDATE are now wrapped in a single transaction. Without this wrapper, a handler crash between the two statements would leave `kudos_read` populated but `first_kudos_read_at` NULL — causing the teaching moment to render incorrectly on the user's actual second read. **Correctness:** §5 Flow 2's "your books are being picked up" SQL now uses `date_trunc('week', NOW() AT TIME ZONE 'America/Vancouver')` instead of UTC week truncation — Vancouver users' "this week" rolls over at Monday 0:00 PT, not Sunday 16:00 PT (the UTC-week boundary in PT). v1.5+ parameterizes on `team_settings.timezone`. §7 `createKudos` team-kudos branch comment now says "team members with status IN ('active', 'on_leave')" — per PRD §14, on-leave colleagues still receive team kudos their team gets during their absence. **Clarity:** §4 cross-tenant rule restructured — the three-layer enforcement list now precedes the exception block (prior layout placed the exception between the heading and the numbered list, reading as if it were the first layer); the exception now enumerates three patterns (queue-drain, tenant-iteration, **and system-wide operational** — `dr-verify` and `audit-purge` previously fit none). §5 Flow 1 inline rev annotations dropped (`(rev 1.1)`, `(rev 1.2)`) — change log captures history; in-diagram annotations read as TODO markers. §5 Flow 2 first-ever-read invariant note adds the rejoiner semantic — hard-deleted-and-rejoined team_members get a new row with `first_kudos_read_at = NULL`, so the teaching moment renders again on their first post-rejoin read (intentional; treats rejoining as a new relationship). §11 outbox-poller alert documents the 30min-lookback trade-off — rows aging past the live alert window are caught by a weekly cron_run_log dead-letter review. **Front-matter + closing section now read "ready for ADR extraction and implementation handoff."** No companion PRD changes in this rev. |
 | 1.3 | 2026-06-02 | Critic batch-3 fixes (after PRD-aware re-review). **Bugs:** §5 Flow 2 "first-ever read" race-freeness claim was wrong — `xmax + EXISTS` pattern was still racy at READ COMMITTED for inter-transaction races (two concurrent reads by the same brand-new reader could both see "no other row" and both render the teaching moment). Replaced with a denormalized `team_member.first_kudos_read_at` column and atomic conditional UPDATE (`UPDATE … WHERE first_kudos_read_at IS NULL RETURNING id`) — Postgres serializes UPDATEs to the same row, so exactly one of two concurrent first-time reads wins; the other returns zero rows. Genuinely race-free at any isolation level. Companion PRD schema add: `team_member.first_kudos_read_at`. §5 Flow 1 outbox-poller pseudocode synced with §6/§8 (LIMIT 25 not 50; added `AND cancelled_at IS NULL` filter; added the second `deleted_at` re-check immediately before sendEmail). Without this sync, the Flow 1 diagram and §6/§8 disagreed; an implementer reading Flow 1 would have written the original broken poller. **Polish:** §8 soft-delete-mid-render second check now describes the correct mechanism — a fresh `SELECT` relying on Postgres MVCC, NOT "same transaction context" (you can't hold a Postgres transaction across a Resend HTTP call without burning a DB connection for seconds); §11 `dr-verify` and `outbox-poller` alerts restructured to `MAX(completed_at)`-based logic with bounded hung-row lookback (49h for dr-verify, 30min for outbox-poller) — prior AND clause for dr-verify was logically redundant; prior outbox-poller second clause could leave a single slow invocation paging indefinitely; §6 cross-reference fixed (polling execution-time budget lives in §6, not §10); §4 system-worker carve-out reframed to cover both queue-drain crons (outbox poller, badge evaluator) AND tenant-iteration crons (Flow 3 manager digest enumerates tenants) — previously only the queue-drain pattern was named, leaving Flow 3's `SELECT id FROM tenant` un-covered. Closing-section version corrected from 1.1 to 1.3 (rev 1.2 had drifted). Companion PRD reconciliation in 7.5.4: PRD §11 adds `team_member.first_kudos_read_at` column. |
 | 1.2 | 2026-06-02 | Critic batch-2 fixes (after PRD-aware re-review). **Bugs:** §7 `createKudos` code example now uses the correct `recipient_notify:k:<kudos_id>:r:<recipient_id>` idempotency key shape (the §5 diagram had been corrected in rev 1.1 but the code example had not — same shape now in both, plus a team-kudos branch comment so the pattern is unambiguous); §5 Flow 2 "first-ever read" detection rewritten from racy `SELECT COUNT(*)` to `RETURNING (xmax = 0)` on the UPSERT + same-transaction `EXISTS` check (race-free at READ COMMITTED); §8 soft-delete mid-render race window correctly framed as inclusive of the 500ms–3s Resend API call (not sub-second) + added second `deleted_at` re-check immediately before `sendEmail`; §5 anniversary-reminder cron now documents the dual opt-out check (`email_settings.anniversary_about_me` for the subject + `email_settings.anniversary_reminders` for the recipient); §11 cron `last run` alerts disambiguated to specify started_at vs completed_at semantics — outbox-poller alerts on stale started_at OR hung (started but not completed within window). **Polish:** §4 tenant-isolation HARD invariant now states an explicit system-level-worker carve-out for the outbox poller, badge evaluator, and cron_run_log inserts; §6 POST /api/kudos request body comment for `value_tag_ids` cites PRD §6 (pre-tag-with-skip rule) instead of the rev 7.3 footnote; §12 "your books are being picked up" query — added concrete SQL + index strategy + v1.5+ denormalization note; §12 timezone-handling section now distinguishes time-of-day-sensitive crons (self-gate) from frequency-driven crons (outbox-poller and badge-evaluator — native cadence, no self-gate); §12 migration two-step removal rule now documents WHY it's deliberately kept conservative (rollback safety + future multi-service deploy lag) despite Vercel's atomic-swap making single-step safe within a single deploy. Companion PRD reconciliation in 7.5.3: NextAuth credentials-provider statements aligned across PRD §6, §6 sub-bullet, §9 readiness checklist, §15 milestone 4, and Appendix A — all now honestly state "single-column migration (`password_hash`) + provider wiring (~1 day)" instead of the misleading "no schema migration." Out of scope: tenant-isolation test suite specification deepening — kept as-is for ADD; full mechanism (API surface generator, CI enforcement) defers to implementation plan. |

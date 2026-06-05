@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { auth } from "@/lib/auth/auth";
 import { extractTenantContext, type TenantContext, type UserRole } from "@/lib/auth/tenant-context";
-import { ForbiddenError, UnauthorizedError } from "@/lib/errors/app-error";
+import { AppError, ForbiddenError, RateLimitError, UnauthorizedError } from "@/lib/errors/app-error";
 import { prisma } from "@/lib/db/prisma";
 
 type RouteHandler<T = unknown> = (
@@ -12,23 +12,37 @@ type RouteHandler<T = unknown> = (
 
 export function withTenantContext<T = unknown>(handler: RouteHandler<T>) {
   return async (req: Request): Promise<NextResponse> => {
-    const session = await auth();
-    if (!session?.user?.id) {
-      throw new UnauthorizedError();
+    try {
+      const session = await auth();
+      if (!session?.user?.id) {
+        return NextResponse.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, { status: 401 });
+      }
+
+      const member = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { role: true, status: true },
+      });
+
+      const inactiveStatuses = ["former", "deleted", "pending_deletion"];
+      if (!member || inactiveStatuses.includes(member.status)) {
+        return NextResponse.json({ error: "Account not active", code: "UNAUTHORIZED" }, { status: 401 });
+      }
+
+      const ctx = extractTenantContext(session.user.id, member.role as UserRole);
+      return await handler(req, ctx);
+    } catch (err) {
+      if (err instanceof RateLimitError) {
+        return NextResponse.json(
+          { error: err.message, code: err.code },
+          { status: 429, headers: { "Retry-After": String(err.retryAfterSeconds) } },
+        );
+      }
+      if (err instanceof AppError) {
+        return NextResponse.json({ error: err.message, code: err.code }, { status: err.httpStatus });
+      }
+      console.error("Unhandled route error:", err);
+      return NextResponse.json({ error: "Internal server error", code: "INTERNAL_ERROR" }, { status: 500 });
     }
-
-    const member = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true, status: true },
-    });
-
-    const inactiveStatuses = ["former", "deleted", "pending_deletion"];
-    if (!member || inactiveStatuses.includes(member.status)) {
-      throw new UnauthorizedError("Account not active");
-    }
-
-    const ctx = extractTenantContext(session.user.id, member.role as UserRole);
-    return handler(req, ctx);
   };
 }
 
