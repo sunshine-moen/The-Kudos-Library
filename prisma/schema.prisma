@@ -1,0 +1,697 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  user
+  manager
+  admin
+}
+
+enum MemberStatus {
+  active
+  on_leave
+  hidden
+  former
+  deleted
+  pending_deletion
+}
+
+enum DigestCadence {
+  weekly
+  biweekly
+}
+
+enum TeamKind {
+  organization
+  sub_team
+}
+
+enum EmailTemplateType {
+  recipient_notify
+  manager_digest
+  manager_quiet_week
+  top_giver_announcement
+  badge_milestone
+  inactive_nudge
+  overlooked_recipient_nudge
+  work_anniversary_reminder
+  broadcast
+  prompt_of_the_week
+  prompt_admin_reminder
+  kudos_was_read_digest
+  deletion_confirmation
+  deletion_cancelled
+}
+
+enum MagicLinkTokenKind {
+  login
+  deep_link
+}
+
+enum AnniversaryKind {
+  ubc
+  ag
+}
+
+enum AnniversaryLeadTime {
+  one_week_before   @map("1_week_before")
+  three_days_before @map("3_days_before")
+  day_of
+}
+
+enum LeaderboardKind {
+  top_giver_week
+  top_giver_month
+}
+
+enum CronOutcome {
+  success
+  partial
+  failure
+}
+
+enum FeedbackKind {
+  feature_request
+  bug_report
+}
+
+enum FeedbackStatus {
+  open
+  acknowledged
+  closed
+}
+
+// ─── Cross-tenant (no tenant_id) ─────────────────────────────────────────────
+
+model Tenant {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  slug       String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  members                    User[]
+  teams                      Team[]
+  kudos                      Kudos[]
+  kudos_reads                KudosRead[]
+  value_tags                 ValueTag[]
+  context_categories         ContextCategory[]
+  prompt_starters            PromptStarter[]
+  featured_prompts           FeaturedPrompt[]
+  badge_definitions          BadgeDefinition[]
+  badge_awards               BadgeAward[]
+  leaderboard_winners        LeaderboardWinner[]
+  email_templates            EmailTemplate[]
+  author_quotes              AuthorQuote[]
+  static_contents            StaticContent[]
+  team_settings              TeamSettings?
+  email_outboxes             EmailOutbox[]
+  email_send_logs            EmailSendLog[]
+  admin_audit_logs           AdminAuditLog[]
+  cron_run_logs              CronRunLog[]
+  device_confirmations       DeviceConfirmation[]
+  magic_link_tokens          MagicLinkToken[]
+  work_anniversary_reminders WorkAnniversaryReminder[]
+  feedback_submissions       FeedbackSubmission[]
+
+  @@map("tenant")
+}
+
+model IconPreset {
+  key          String @id
+  visual_asset String
+  label        String
+
+  users User[]
+
+  @@map("icon_preset")
+}
+
+// ─── NextAuth session tables ──────────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("account")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String   @db.Uuid
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_token")
+}
+
+// ─── People + teams (tenant-scoped) ──────────────────────────────────────────
+
+// User IS team_member — the NextAuth PrismaAdapter maps to this table.
+// Pre-seeded roster means members are found (not created) on first magic-link login.
+model User {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // NextAuth required fields
+  name            String?
+  email           String        @unique
+  emailVerified   DateTime?
+  image           String?
+  // App-specific fields
+  tenant_id       String        @db.Uuid
+  first_name      String        @default("")
+  last_name       String        @default("")
+  department      String        @default("")
+  job_title       String        @default("")
+  ubc_hire_date   DateTime?     @db.Date
+  ag_join_date    DateTime?     @db.Date
+  icon            String        @default("book-default")
+  role            UserRole      @default(user)
+  manager_id      String?       @db.Uuid
+  sub_team_id     String?       @db.Uuid
+  digest_cadence  DigestCadence @default(weekly)
+  status          MemberStatus  @default(active)
+  on_leave_from   DateTime?
+  on_leave_until  DateTime?
+  tos_accepted_at DateTime?
+  // Atomic first-read claim — drives recipient onboarding teaching moment
+  first_kudos_read_at DateTime?
+  // Grace-period account deletion — cron processes rows past 30d
+  pending_deletion_at DateTime?
+  email_settings  Json          @default("{\"anniversary_reminders\":true,\"anniversary_about_me\":true,\"overlooked_recipient_nudge\":true,\"inactive_giver_nudge\":true,\"top_giver_thank_you\":true,\"prompt_of_the_week\":true,\"kudos_was_read_digest\":false,\"show_pickup_indicator\":true}")
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @updatedAt
+
+  tenant        Tenant      @relation(fields: [tenant_id], references: [id])
+  manager       User?       @relation("MemberManager", fields: [manager_id], references: [id])
+  reports       User[]      @relation("MemberManager")
+  sub_team      Team?       @relation("SubTeamMembers", fields: [sub_team_id], references: [id])
+  icon_preset   IconPreset? @relation(fields: [icon], references: [key])
+  accounts      Account[]
+  sessions      Session[]
+
+  kudos_given          Kudos[]                  @relation("KudosGiver")
+  kudos_received       Kudos[]                  @relation("KudosRecipient")
+  kudos_reads          KudosRead[]              @relation("KudosReader")
+  prompts_scheduled    FeaturedPrompt[]         @relation("PromptScheduler")
+  badge_awards         BadgeAward[]             @relation("BadgeAwardedTo")
+  leaderboard_wins     LeaderboardWinner[]
+  email_outboxes       EmailOutbox[]            @relation("OutboxRecipient")
+  email_send_logs      EmailSendLog[]
+  admin_audit_logs     AdminAuditLog[]          @relation("AuditActor")
+  magic_link_tokens    MagicLinkToken[]         @relation("TokenMember")
+  work_anniversaries   WorkAnniversaryReminder[]
+  feedback_submissions FeedbackSubmission[]
+
+  @@unique([tenant_id, email])
+  @@index([tenant_id])
+  // Partial index idx_team_member_pending_deletion created via raw SQL in migration 002b
+  @@map("team_member")
+}
+
+model Team {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id    String   @db.Uuid
+  name         String
+  slug         String
+  description  String   @default("")
+  kind         TeamKind
+  visual_asset String   @default("")
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  tenant         Tenant  @relation(fields: [tenant_id], references: [id])
+  members        User[]  @relation("SubTeamMembers")
+  kudos_received Kudos[] @relation("KudosTeamRecipient")
+
+  @@unique([tenant_id, slug])
+  // Composite unique (id, tenant_id) — required for composite FK references from kudos
+  // Created via raw SQL in migration 002a
+  @@map("team")
+}
+
+model DeviceConfirmation {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id    String   @db.Uuid
+  email        String
+  device_token String
+  confirmed_at DateTime
+  last_used_at DateTime @default(now())
+  created_at   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id])
+
+  @@unique([tenant_id, email, device_token])
+  @@map("device_confirmation")
+}
+
+model MagicLinkToken {
+  id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id       String             @db.Uuid
+  token_hash      String
+  email           String
+  kind            MagicLinkTokenKind
+  target_kudos_id String?            @db.Uuid
+  expires_at      DateTime
+  used_at         DateTime?
+  created_at      DateTime           @default(now())
+
+  tenant       Tenant  @relation(fields: [tenant_id], references: [id])
+  target_kudos Kudos?  @relation(fields: [target_kudos_id], references: [id])
+  member       User?   @relation("TokenMember", fields: [email], references: [email])
+
+  @@index([token_hash])
+  @@index([expires_at])
+  // DB CHECK: (kind='deep_link' AND target_kudos_id IS NOT NULL) OR (kind='login' AND target_kudos_id IS NULL)
+  // Created via raw SQL in migration 003
+  @@map("magic_link_token")
+}
+
+model TeamSettings {
+  id                                       String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id                                String              @unique @db.Uuid
+  max_admins                               Int                 @default(3)
+  inactive_threshold_weeks                 Int                 @default(4)
+  overlooked_recipient_window_days         Int                 @default(30)
+  top_giver_send_local_time                String              @default("15:00")
+  anniversary_lead_time                    AnniversaryLeadTime @default(one_week_before)
+  anniversary_email_local_time             String              @default("09:00")
+  timezone                                 String              @default("America/Vancouver")
+  email_log_retention_days                 Int                 @default(90)
+  leaderboard_top_n_week                   Int                 @default(5)
+  leaderboard_top_n_month                  Int                 @default(5)
+  prompt_of_week_send_local_day_and_time   String              @default("wednesday 09:00")
+  prompt_admin_reminder_local_day_and_time String              @default("friday 09:00")
+  kudos_was_read_digest_local_day_and_time String              @default("friday 15:00")
+  created_at                               DateTime            @default(now())
+  updated_at                               DateTime            @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id])
+
+  @@map("team_settings")
+}
+
+// ─── Admin-editable content (tenant-scoped) ───────────────────────────────────
+
+model ValueTag {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id     String   @db.Uuid
+  key           String
+  label         String
+  group_label   String   @default("")
+  is_active     Boolean  @default(true)
+  display_order Int      @default(0)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  tenant           Tenant           @relation(fields: [tenant_id], references: [id])
+  kudos_values     KudosValue[]
+  featured_prompts FeaturedPrompt[] @relation("PromptPreTag")
+
+  @@unique([tenant_id, key])
+  // Composite unique (id, tenant_id) for composite FK references — raw SQL in migration 004
+  @@map("value_tag")
+}
+
+model ContextCategory {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id     String   @db.Uuid
+  key           String
+  label         String
+  is_active     Boolean  @default(true)
+  display_order Int      @default(0)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  tenant Tenant  @relation(fields: [tenant_id], references: [id])
+  kudos  Kudos[]
+
+  @@unique([tenant_id, key])
+  @@map("context_category")
+}
+
+model PromptStarter {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id     String   @db.Uuid
+  label         String
+  starter_text  String   @db.Text
+  is_active     Boolean  @default(true)
+  display_order Int      @default(0)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id])
+
+  @@map("prompt_starter")
+}
+
+model AuthorQuote {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id        String    @db.Uuid
+  author_name      String
+  author_country   String    @default("")
+  quote_text       String    @db.Text
+  source_work      String?
+  is_active        Boolean   @default(true)
+  last_reviewed_at DateTime?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  tenant          Tenant         @relation(fields: [tenant_id], references: [id])
+  email_send_logs EmailSendLog[]
+
+  // DB CHECK: char_length(quote_text) <= 300 — raw SQL in migration 004
+  @@map("author_quote")
+}
+
+model StaticContent {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id    String   @db.Uuid
+  key          String
+  version      Int      @default(1)
+  body_html    String   @db.Text
+  effective_at DateTime @default(now())
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id])
+
+  @@unique([tenant_id, key])
+  @@map("static_content")
+}
+
+model EmailTemplate {
+  id           String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id    String            @db.Uuid
+  type         EmailTemplateType
+  subject_line String
+  body_html    String            @db.Text
+  created_at   DateTime          @default(now())
+  updated_at   DateTime          @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id])
+
+  @@unique([tenant_id, type])
+  @@map("email_template")
+}
+
+// ─── Featured prompts ─────────────────────────────────────────────────────────
+
+model FeaturedPrompt {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id           String    @db.Uuid
+  // NULL for default-rotation prompts; Monday of target week for scheduled ones
+  week_start_date     DateTime? @db.Date
+  prompt_text         String    @db.Text
+  pre_tag_value_id    String?   @db.Uuid
+  scheduled_by        String?   @db.Uuid
+  is_default_rotation Boolean   @default(false)
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  tenant            Tenant    @relation(fields: [tenant_id], references: [id])
+  pre_tag_value     ValueTag? @relation("PromptPreTag", fields: [pre_tag_value_id], references: [id])
+  scheduled_by_user User?     @relation("PromptScheduler", fields: [scheduled_by], references: [id])
+  kudos             Kudos[]
+
+  // Partial UNIQUE INDEX: (tenant_id, week_start_date) WHERE week_start_date IS NOT NULL
+  // Created via raw SQL in migration 005a — default-rotation prompts (NULL week_start_date) are unconstrained
+  @@map("featured_prompt")
+}
+
+// ─── Kudos ────────────────────────────────────────────────────────────────────
+
+model Kudos {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id            String    @db.Uuid
+  recipient_id         String?   @db.Uuid
+  team_recipient_id    String?   @db.Uuid
+  giver_id             String    @db.Uuid
+  message_text         String    @db.Text
+  book_design          String    @default("classic-navy")
+  font_choice          String    @default("garamond")
+  context_category_id  String?   @db.Uuid
+  context_text         String?
+  giphy_id             String?
+  featured_prompt_id   String?   @db.Uuid
+  submitted_at         DateTime  @default(now())
+  edit_window_expires_at DateTime
+  badge_evaluated_at   DateTime?
+  deleted_at           DateTime?
+  updated_at           DateTime  @updatedAt
+
+  tenant           Tenant           @relation(fields: [tenant_id], references: [id])
+  recipient        User?            @relation("KudosRecipient", fields: [recipient_id], references: [id])
+  team_recipient   Team?            @relation("KudosTeamRecipient", fields: [team_recipient_id], references: [id])
+  giver            User             @relation("KudosGiver", fields: [giver_id], references: [id])
+  context_category ContextCategory? @relation(fields: [context_category_id], references: [id])
+  featured_prompt  FeaturedPrompt?  @relation(fields: [featured_prompt_id], references: [id])
+  kudos_values     KudosValue[]
+  kudos_reads      KudosRead[]
+  email_outboxes   EmailOutbox[]
+  magic_link_tokens MagicLinkToken[]
+
+  @@index([tenant_id])
+  // idx_kudos_giver: used by soft-delete recompute (scoped to affected giver)
+  @@index([giver_id, tenant_id, deleted_at], map: "idx_kudos_giver")
+  @@index([edit_window_expires_at, badge_evaluated_at, deleted_at], map: "idx_kudos_badge_eval")
+  // CHECK constraints (num_nonnulls, self-kudos, context_text length) added via raw SQL in migration 005b
+  // Composite UNIQUE (id, tenant_id) for composite FK support added via raw SQL in migration 005b
+  @@map("kudos")
+}
+
+model KudosValue {
+  kudos_id     String @db.Uuid
+  value_tag_id String @db.Uuid
+  tenant_id    String @db.Uuid
+
+  kudos     Kudos    @relation(fields: [kudos_id], references: [id], onDelete: Cascade)
+  value_tag ValueTag @relation(fields: [value_tag_id], references: [id])
+
+  @@id([kudos_id, value_tag_id])
+  // Composite FKs (kudos_id, tenant_id) and (value_tag_id, tenant_id) added via raw SQL in migration 005c
+  @@map("kudos_value")
+}
+
+model KudosRead {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id String   @db.Uuid
+  kudos_id  String   @db.Uuid
+  reader_id String   @db.Uuid
+  read_at   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id])
+  kudos  Kudos  @relation(fields: [kudos_id], references: [id])
+  reader User   @relation("KudosReader", fields: [reader_id], references: [id])
+
+  @@unique([kudos_id, reader_id])
+  @@index([reader_id, tenant_id], map: "idx_kudos_read_reader")
+  @@map("kudos_read")
+}
+
+// ─── Recognition ─────────────────────────────────────────────────────────────
+
+model BadgeDefinition {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id    String   @db.Uuid
+  key          String
+  name         String
+  description  String   @db.Text
+  criteria     Json
+  visual_asset String   @default("")
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  tenant       Tenant       @relation(fields: [tenant_id], references: [id])
+  badge_awards BadgeAward[]
+
+  @@unique([tenant_id, key])
+  @@map("badge_definition")
+}
+
+model BadgeAward {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id  String   @db.Uuid
+  badge_id   String   @db.Uuid
+  awarded_to String   @db.Uuid
+  awarded_at DateTime @default(now())
+
+  tenant     Tenant          @relation(fields: [tenant_id], references: [id])
+  badge      BadgeDefinition @relation(fields: [badge_id], references: [id])
+  awardee    User            @relation("BadgeAwardedTo", fields: [awarded_to], references: [id])
+  email_outboxes EmailOutbox[] @relation("OutboxBadgeAward")
+
+  @@unique([tenant_id, badge_id, awarded_to, awarded_at])
+  @@map("badge_award")
+}
+
+model LeaderboardWinner {
+  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id    String          @db.Uuid
+  kind         LeaderboardKind
+  period_start DateTime        @db.Date
+  period_end   DateTime        @db.Date
+  winner_id    String          @db.Uuid
+  rank         Int
+  kudos_count  Int
+  awarded_at   DateTime        @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id])
+  winner User   @relation(fields: [winner_id], references: [id])
+
+  // Idempotency key: when Mon-1st double-fires, second insert is a no-op
+  @@unique([tenant_id, kind, period_start, rank])
+  @@map("leaderboard_winner")
+}
+
+// ─── Email infrastructure ─────────────────────────────────────────────────────
+
+model EmailOutbox {
+  id                       String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id                String            @db.Uuid
+  template_type            EmailTemplateType
+  kudos_id                 String?           @db.Uuid
+  recipient_user_id        String?           @db.Uuid
+  recipient_email_override String?
+  badge_award_id           String?           @db.Uuid
+  payload                  Json?
+  send_after               DateTime          @default(now())
+  idempotency_key          String            @unique
+  delivered_at             DateTime?
+  failed_at                DateTime?
+  failure_reason           String?
+  attempts                 Int               @default(0)
+  cancelled_at             DateTime?
+  cancellation_reason      String?
+  created_at               DateTime          @default(now())
+  updated_at               DateTime          @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenant_id], references: [id])
+  kudos       Kudos?      @relation(fields: [kudos_id], references: [id], onDelete: Cascade)
+  recipient   User?       @relation("OutboxRecipient", fields: [recipient_user_id], references: [id])
+  badge_award BadgeAward? @relation("OutboxBadgeAward", fields: [badge_award_id], references: [id])
+
+  @@index([send_after])
+  // Partial index idx_outbox_pending added via raw SQL in migration 007
+  @@map("email_outbox")
+}
+
+model EmailSendLog {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id       String            @db.Uuid
+  template_type   EmailTemplateType
+  recipient_email String
+  quote_id        String?           @db.Uuid
+  sent_at         DateTime?
+  failed_at       DateTime?
+  failure_reason  String?
+  attempts        Int               @default(0)
+  created_at      DateTime          @default(now())
+
+  tenant Tenant       @relation(fields: [tenant_id], references: [id])
+  quote  AuthorQuote? @relation(fields: [quote_id], references: [id])
+  recipient User?     @relation(fields: [recipient_email], references: [email])
+
+  @@index([tenant_id, created_at])
+  @@map("email_send_log")
+}
+
+// ─── Admin tables ─────────────────────────────────────────────────────────────
+
+model AdminAuditLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id   String   @db.Uuid
+  actor_id    String?  @db.Uuid
+  action      String
+  target_type String
+  target_id   String?
+  metadata    Json?
+  occurred_at DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id])
+  actor  User?  @relation("AuditActor", fields: [actor_id], references: [id])
+
+  @@index([tenant_id, occurred_at])
+  @@map("admin_audit_log")
+}
+
+model CronRunLog {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cron_name      String
+  tenant_id      String?     @db.Uuid
+  started_at     DateTime    @default(now())
+  completed_at   DateTime?
+  rows_processed Int?
+  outcome        CronOutcome
+  error_message  String?
+
+  tenant Tenant? @relation(fields: [tenant_id], references: [id])
+
+  @@index([cron_name, started_at])
+  @@map("cron_run_log")
+}
+
+model WorkAnniversaryReminder {
+  id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id        String          @db.Uuid
+  employee_id      String          @db.Uuid
+  anniversary_kind AnniversaryKind
+  anniversary_date DateTime        @db.Date
+  sent_at          DateTime        @default(now())
+
+  tenant   Tenant @relation(fields: [tenant_id], references: [id])
+  employee User   @relation(fields: [employee_id], references: [id])
+
+  @@unique([tenant_id, employee_id, anniversary_kind, anniversary_date])
+  @@map("work_anniversary_reminder")
+}
+
+model FeedbackSubmission {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id    String         @db.Uuid
+  submitted_by String         @db.Uuid
+  kind         FeedbackKind
+  subject      String
+  body         String         @db.Text
+  status       FeedbackStatus @default(open)
+  created_at   DateTime       @default(now())
+  resolved_at  DateTime?
+  updated_at   DateTime       @updatedAt
+
+  tenant    Tenant @relation(fields: [tenant_id], references: [id])
+  submitter User   @relation(fields: [submitted_by], references: [id])
+
+  @@index([tenant_id, status])
+  @@map("feedback_submission")
+}
