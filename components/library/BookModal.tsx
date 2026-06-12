@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { PRODUCT_COPY } from "@/lib/content/hardcoded";
@@ -14,10 +14,13 @@ interface KudosData {
   message_text: string;
   book_design: string;
   giphy_id: string | null;
+  gif_alt_text: string | null;
   context_text: string | null;
   deleted_at: string | null;
-  giver: { first_name: string; last_name: string };
+  team_recipient_id: string | null;
+  giver: { first_name: string; last_name: string } | null;
   recipient: { first_name: string; last_name: string } | null;
+  team_recipient: { name: string } | null;
   context_category: { label: string } | null;
   kudos_values: { value_tag: ValueTag }[];
 }
@@ -45,9 +48,19 @@ export default function BookModal({ kudos, isFirstEverRead, isModal = false, isA
   const [deleting, setDeleting] = useState(false);
   const [motionEnabled, setMotionEnabled] = useState(true);
 
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setMotionEnabled(false);
+    }
+  }, []);
+
   const spineColor = SPINE_COLORS[kudos.book_design] ?? SPINE_COLORS["classic-navy"]!;
-  const giverName = `${kudos.giver.first_name} ${kudos.giver.last_name}`;
-  const recipientFirstName = kudos.recipient?.first_name ?? "you";
+  const giverName = kudos.giver ? `${kudos.giver.first_name} ${kudos.giver.last_name}` : "Anonymous";
+  const recipientDisplay = kudos.team_recipient
+    ? kudos.team_recipient.name
+    : kudos.recipient
+      ? `${kudos.recipient.first_name} ${kudos.recipient.last_name}`
+      : "you";
 
   async function handleDelete() {
     setDeleting(true);
@@ -76,9 +89,9 @@ export default function BookModal({ kudos, isFirstEverRead, isModal = false, isA
           role="note"
         >
           <p style={{ font: "var(--text-app-body-sm)", fontStyle: "italic" }}>
-            {PRODUCT_COPY.teachingMoments?.individual
-              ? PRODUCT_COPY.teachingMoments.individual(kudos.giver.first_name)
-              : `This is what ${kudos.giver.first_name} saw. The library keeps things like this.`}
+            {kudos.team_recipient_id
+              ? PRODUCT_COPY.teachingMoments.team(kudos.giver?.first_name ?? "Someone")
+              : PRODUCT_COPY.teachingMoments.individual(kudos.giver?.first_name ?? "Someone")}
           </p>
         </div>
       )}
@@ -106,7 +119,7 @@ export default function BookModal({ kudos, isFirstEverRead, isModal = false, isA
         <p style={{ font: "var(--text-app-body-sm)", color: "var(--lib-parchment)" }}>from</p>
         <p style={{ font: "var(--text-app-title)", color: "var(--inst-navy)" }}>{giverName}</p>
         <p style={{ font: "var(--text-app-body-sm)", color: "var(--lib-parchment)" }}>
-          to {kudos.recipient ? `${kudos.recipient.first_name} ${kudos.recipient.last_name}` : recipientFirstName}
+          to {recipientDisplay}
         </p>
       </div>
 
@@ -156,15 +169,31 @@ export default function BookModal({ kudos, isFirstEverRead, isModal = false, isA
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`https://media.giphy.com/media/${kudos.giphy_id}/giphy.gif`}
-            alt="Kudos GIF"
+            alt={kudos.gif_alt_text ?? "Kudos GIF"}
+            loading="lazy"
             className="rounded max-w-full"
             style={{ maxHeight: 200 }}
           />
+          <p style={{ font: "var(--text-app-ui)", fontSize: 10, color: "var(--lib-parchment)", marginTop: 4 }}>
+            Powered by GIPHY
+          </p>
         </div>
       )}
 
-      {/* Pay-it-forward nudge placeholder (Phase C2) */}
-      {!isFirstEverRead && <div aria-hidden className="pb-4" />}
+      {/* Pay-it-forward nudge — shown on all reads except the very first */}
+      {!isFirstEverRead && (
+        <div className="mx-6 mb-4 rounded-sm px-4 py-3" style={{ background: "var(--lib-parchment)", borderLeft: "3px solid var(--inst-gold)" }}>
+          <p style={{ font: "var(--text-app-ui)", fontSize: 13, color: "var(--lib-ink)", margin: "0 0 8px", lineHeight: 1.5 }}>
+            Inspired? Take a moment to celebrate someone on your team.
+          </p>
+          <a
+            href="/celebrate"
+            style={{ font: "var(--text-app-ui)", fontSize: 13, fontWeight: 700, color: "var(--inst-navy)", textDecoration: "underline" }}
+          >
+            Write a kudos →
+          </a>
+        </div>
+      )}
 
       {/* Controls */}
       <div className="px-6 pb-6 flex items-center justify-between">
@@ -191,6 +220,9 @@ export default function BookModal({ kudos, isFirstEverRead, isModal = false, isA
       {/* Delete confirmation */}
       {showDeleteConfirm && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-confirm-title"
           className="fixed inset-0 z-50 flex items-center justify-center"
           style={{ background: "rgba(0,0,0,0.5)" }}
         >
@@ -198,7 +230,7 @@ export default function BookModal({ kudos, isFirstEverRead, isModal = false, isA
             className="rounded-sm p-6 w-full max-w-sm"
             style={{ background: "var(--lib-cream)" }}
           >
-            <p className="mb-4" style={{ font: "var(--text-app-body)", color: "var(--lib-ink)" }}>
+            <p id="delete-confirm-title" className="mb-4" style={{ font: "var(--text-app-body)", color: "var(--lib-ink)" }}>
               Remove this kudos? This cannot be undone.
             </p>
             <div className="flex gap-3">
@@ -228,6 +260,9 @@ export default function BookModal({ kudos, isFirstEverRead, isModal = false, isA
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Kudos"
       className="fixed inset-0 z-40 flex items-center justify-center px-4"
       style={{ background: "rgba(0,0,0,0.5)" }}
       onClick={(e) => { if (e.target === e.currentTarget) router.back(); }}
@@ -237,7 +272,7 @@ export default function BookModal({ kudos, isFirstEverRead, isModal = false, isA
           initial={motionEnabled ? { rotateY: -90, opacity: 0 } : false}
           animate={{ rotateY: 0, opacity: 1 }}
           transition={{ duration: 0.35, ease: "easeOut" }}
-          style={{ width: "100%", maxWidth: 560 }}
+          style={{ width: "100%", maxWidth: 560, willChange: "transform" }}
         >
           <button
             onClick={() => router.back()}

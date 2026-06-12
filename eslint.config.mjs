@@ -23,6 +23,7 @@ const eslintConfig = [
               group: ["@prisma/client"],
               message:
                 "Do not import PrismaClient directly. Use the singleton in lib/db/prisma.ts or repository functions in lib/db/repositories/*.",
+              allowTypeImports: true,
             },
           ],
         },
@@ -36,6 +37,7 @@ const eslintConfig = [
       "lib/badges/**",
       "lib/auth/**",
       "lib/cron/**",
+      "app/api/webhook/cron/**",
       "scripts/**",
       "prisma/**",
     ],

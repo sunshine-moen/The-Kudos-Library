@@ -26,6 +26,9 @@
     "framer-motion": "^12.15.0",
     "zod": "^3.25.36"
   },
+  "prisma": {
+    "seed": "tsx scripts/seed/index.ts"
+  },
   "devDependencies": {
     "@types/node": "^22",
     "@types/react": "^19",

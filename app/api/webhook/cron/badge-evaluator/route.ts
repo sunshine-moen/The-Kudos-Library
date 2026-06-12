@@ -35,9 +35,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, kudosProcessed: 0, badgesAwarded: 0 });
     }
 
-    // Deduplicate givers — evaluate each giver only once
+    // Deduplicate givers — evaluate each giver only once; skip anonymized kudos (giver_id null)
     const giverMap = new Map<string, { giverId: string; tenantId: string; kudosIds: string[] }>();
     for (const k of readyKudos) {
+      if (!k.giver_id) continue;
       const key = `${k.tenant_id}:${k.giver_id}`;
       const entry = giverMap.get(key);
       if (entry) {

@@ -17,7 +17,7 @@ export const POST = withTenantContext(async (req, ctx) => {
 
   const input = parsed.data;
 
-  if (input.recipient_id === ctx.userId) {
+  if (input.mode === "individual" && input.recipient_id === ctx.userId) {
     throw new ForbiddenError("You cannot give kudos to yourself");
   }
 
@@ -37,13 +37,15 @@ export const POST = withTenantContext(async (req, ctx) => {
       data: {
         tenant_id: ctx.tenantId,
         giver_id: ctx.userId,
-        recipient_id: input.recipient_id,
+        recipient_id: input.mode === "individual" ? input.recipient_id : null,
+        team_recipient_id: input.mode === "team" ? input.team_recipient_id : null,
         message_text: input.message_text,
         book_design: input.book_design ?? "classic-navy",
         font_choice: input.font_choice ?? "garamond",
         context_category_id: input.context_category_id ?? null,
         context_text: input.context_text ?? null,
         giphy_id: input.giphy_id ?? null,
+        gif_alt_text: input.gif_alt_text ?? null,
         featured_prompt_id: input.featured_prompt_id ?? null,
         edit_window_expires_at: editWindowExpiresAt,
         kudos_values: input.value_tag_ids.length > 0
@@ -57,14 +59,37 @@ export const POST = withTenantContext(async (req, ctx) => {
       },
     });
 
-    await writeOutboxRow(tx, {
-      tenantId: ctx.tenantId,
-      templateType: "recipient_notify",
-      kudosId: created.id,
-      recipientUserId: input.recipient_id,
-      sendAfter: editWindowExpiresAt,
-      idempotencyKey: `recipient_notify:k:${created.id}:r:${input.recipient_id}`,
-    });
+    if (input.mode === "individual") {
+      await writeOutboxRow(tx, {
+        tenantId: ctx.tenantId,
+        templateType: "recipient_notify",
+        kudosId: created.id,
+        recipientUserId: input.recipient_id,
+        sendAfter: editWindowExpiresAt,
+        idempotencyKey: `recipient_notify:k:${created.id}:r:${input.recipient_id}`,
+      });
+    } else {
+      // Team mode: fan out one outbox row per active/on_leave team member
+      const members = await tx.user.findMany({
+        where: {
+          sub_team_id: input.team_recipient_id,
+          tenant_id: ctx.tenantId,
+          status: { in: ["active", "on_leave"] },
+        },
+        select: { id: true },
+      });
+
+      for (const member of members) {
+        await writeOutboxRow(tx, {
+          tenantId: ctx.tenantId,
+          templateType: "recipient_notify",
+          kudosId: created.id,
+          recipientUserId: member.id,
+          sendAfter: editWindowExpiresAt,
+          idempotencyKey: `recipient_notify:k:${created.id}:r:${member.id}`,
+        });
+      }
+    }
 
     return created;
   });

@@ -52,7 +52,7 @@ export function renderInactiveNudge(data: InactiveNudgeData): string {
     <div style="text-align:center;margin-bottom:32px;">
       <a href="${escapeHtml(data.celebrateUrl)}"
          style="display:inline-block;background:#E69400;color:#002145;text-decoration:none;font-size:14px;font-weight:700;padding:12px 28px;border-radius:2px;">
-        Give a kudos now
+        Give a kudos
       </a>
     </div>
 

@@ -91,7 +91,7 @@ export async function GET(req: Request) {
 
           const { subject, html } = renderRecipientNotify({
             kudos,
-            giver: kudos.giver,
+            giver: kudos.giver ?? { first_name: "Anonymous", last_name: "" },
             recipient: kudos.recipient ?? { first_name: "", last_name: "", email: recipientEmail },
             deepLinkUrl,
             quote,

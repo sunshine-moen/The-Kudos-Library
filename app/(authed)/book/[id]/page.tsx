@@ -38,6 +38,7 @@ export default async function BookPage({
     include: {
       giver: { select: { first_name: true, last_name: true } },
       recipient: { select: { first_name: true, last_name: true } },
+      team_recipient: { select: { name: true } },
       context_category: { select: { label: true } },
       kudos_values: { include: { value_tag: { select: { label: true } } } },
     },
@@ -60,7 +61,12 @@ export default async function BookPage({
   return (
     <main id="main-content" style={{ background: "var(--lib-cream)", minHeight: "100vh" }}>
       <BookModal
-        kudos={{ ...kudos, deleted_at: kudos.deleted_at?.toISOString() ?? null }}
+        kudos={{
+          ...kudos,
+          deleted_at: kudos.deleted_at?.toISOString() ?? null,
+          team_recipient_id: kudos.team_recipient_id,
+          team_recipient: kudos.team_recipient,
+        }}
         isFirstEverRead={isFirstEverRead}
         isModal={false}
         isAdmin={isAdmin}

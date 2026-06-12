@@ -5,13 +5,19 @@ import { extractTenantContext, type TenantContext, type UserRole } from "@/lib/a
 import { AppError, ForbiddenError, RateLimitError, UnauthorizedError } from "@/lib/errors/app-error";
 import { prisma } from "@/lib/db/prisma";
 
-type RouteHandler<T = unknown> = (
+// Next.js route context — params is a Promise in App Router v15
+export interface RouteContext {
+  params: Promise<Record<string, string>>;
+}
+
+type RouteHandler = (
   req: Request,
   ctx: TenantContext,
-) => Promise<NextResponse<T>>;
+  routeCtx: RouteContext,
+) => Promise<NextResponse>;
 
-export function withTenantContext<T = unknown>(handler: RouteHandler<T>) {
-  return async (req: Request): Promise<NextResponse> => {
+export function withTenantContext(handler: RouteHandler) {
+  return async (req: Request, routeCtx: RouteContext): Promise<NextResponse> => {
     try {
       const session = await auth();
       if (!session?.user?.id) {
@@ -29,7 +35,7 @@ export function withTenantContext<T = unknown>(handler: RouteHandler<T>) {
       }
 
       const ctx = extractTenantContext(session.user.id, member.role as UserRole);
-      return await handler(req, ctx);
+      return await handler(req, ctx, routeCtx);
     } catch (err) {
       if (err instanceof RateLimitError) {
         return NextResponse.json(
@@ -46,21 +52,21 @@ export function withTenantContext<T = unknown>(handler: RouteHandler<T>) {
   };
 }
 
-export function requireAdmin<T = unknown>(handler: RouteHandler<T>) {
-  return withTenantContext<T>(async (req, ctx) => {
+export function requireAdmin(handler: RouteHandler) {
+  return withTenantContext(async (req, ctx, routeCtx) => {
     if (ctx.role !== "admin") {
       throw new ForbiddenError("Admin role required");
     }
-    return handler(req, ctx);
+    return handler(req, ctx, routeCtx);
   });
 }
 
-export function requireManager<T = unknown>(handler: RouteHandler<T>) {
-  return withTenantContext<T>(async (req, ctx) => {
+export function requireManager(handler: RouteHandler) {
+  return withTenantContext(async (req, ctx, routeCtx) => {
     if (ctx.role !== "manager" && ctx.role !== "admin") {
       throw new ForbiddenError("Manager role required");
     }
-    return handler(req, ctx);
+    return handler(req, ctx, routeCtx);
   });
 }
 

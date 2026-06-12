@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { EB_Garamond, Crimson_Pro, Special_Elite, Open_Sans, Caveat } from "next/font/google";
+import { headers } from "next/headers";
 import "@/styles/globals.css";
 
 const ebGaramond = EB_Garamond({
@@ -44,16 +45,19 @@ export const metadata: Metadata = {
   description: "A library of moments your team made.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html
       lang="en"
       className={`${ebGaramond.variable} ${crimsonPro.variable} ${specialElite.variable} ${openSans.variable} ${caveat.variable}`}
     >
+      <head>{nonce && <meta name="csp-nonce" content={nonce} />}</head>
       <body>{children}</body>
     </html>
   );

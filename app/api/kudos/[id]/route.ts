@@ -81,8 +81,8 @@ export const DELETE = requireAdmin(async (req, ctx) => {
       },
     });
 
-    // Step 3: Badge recomputation for the giver
-    // Load giver's remaining non-deleted kudos (after the delete above)
+    // Step 3: Badge recomputation for the giver (skip if giver was anonymized)
+    if (!kudos.giver_id) return NextResponse.json({}, { status: 204 });
     const remainingKudos = await tx.kudos.findMany({
       where: { giver_id: kudos.giver_id, tenant_id: ctx.tenantId, deleted_at: null },
       select: {
@@ -157,17 +157,18 @@ export const DELETE = requireAdmin(async (req, ctx) => {
           : (settings?.leaderboard_top_n_month ?? 5);
 
       // Recount kudos given by each member in this period
-      const giverCounts = await tx.kudos.groupBy({
+      const giverCounts = (await tx.kudos.groupBy({
         by: ["giver_id"],
         where: {
           tenant_id: ctx.tenantId,
           submitted_at: { gte: period.period_start, lt: period.period_end },
           deleted_at: null,
+          giver_id: { not: null },
         },
         _count: { id: true },
         orderBy: { _count: { id: "desc" } },
         take: topN,
-      });
+      })).filter((g): g is typeof g & { giver_id: string } => g.giver_id !== null);
 
       // Delete existing rows for this period and re-insert with updated ranks
       await tx.leaderboardWinner.deleteMany({

@@ -115,17 +115,19 @@ async function rolloverLeaderboard({
   if (!tenantId) return 0;
 
   // Count non-deleted kudos given per member in the period
-  const giverCounts = await prisma.kudos.groupBy({
+  const rawCounts = await prisma.kudos.groupBy({
     by: ["giver_id"],
     where: {
       tenant_id: tenantId,
       submitted_at: { gte: periodStart, lt: periodEnd },
       deleted_at: null,
+      giver_id: { not: null },
     },
     _count: { id: true },
     orderBy: { _count: { id: "desc" } },
     take: topN,
   });
+  const giverCounts = rawCounts.filter((g): g is typeof g & { giver_id: string } => g.giver_id !== null);
 
   if (giverCounts.length === 0) return 0;
 

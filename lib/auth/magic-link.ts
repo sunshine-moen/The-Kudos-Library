@@ -52,6 +52,53 @@ export async function verifyDeepLink(
   return { kudosId: row.target_kudos_id, email: row.email, tenantId: row.tenant_id };
 }
 
+const DELETION_CANCEL_TTL_DAYS = 30;
+
+export async function issueDeletionCancelToken(
+  tenantId: string,
+  email: string,
+): Promise<string> {
+  const token = randomUUID();
+  const tokenHash = hashToken(token);
+  const expiresAt = new Date(Date.now() + DELETION_CANCEL_TTL_DAYS * 24 * 60 * 60 * 1000);
+
+  await prisma.magicLinkToken.create({
+    data: {
+      tenant_id: tenantId,
+      token_hash: tokenHash,
+      email,
+      kind: "deletion_cancel",
+      expires_at: expiresAt,
+    },
+  });
+
+  const base = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+  return `${base}/api/auth/deletion-cancel?token=${token}`;
+}
+
+export async function verifyDeletionCancelToken(
+  token: string,
+): Promise<{ email: string; tenantId: string } | null> {
+  const tokenHash = hashToken(token);
+
+  const row = await prisma.magicLinkToken.findFirst({
+    where: { token_hash: tokenHash, kind: "deletion_cancel" },
+  });
+
+  if (!row) return null;
+  if (row.used_at) return null;
+  if (row.expires_at < new Date()) return null;
+
+  const updated = await prisma.magicLinkToken.updateMany({
+    where: { id: row.id, used_at: null },
+    data: { used_at: new Date() },
+  });
+
+  if (updated.count === 0) return null;
+
+  return { email: row.email, tenantId: row.tenant_id };
+}
+
 export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }

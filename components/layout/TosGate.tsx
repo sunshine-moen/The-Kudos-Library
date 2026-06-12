@@ -2,15 +2,23 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
+import { PRODUCT_COPY } from "@/lib/content/hardcoded";
 
 export default function TosGate() {
   const [accepting, setAccepting] = useState(false);
+  const [declining, setDeclining] = useState(false);
   const router = useRouter();
 
   async function handleAccept() {
     setAccepting(true);
     await fetch("/api/me/tos-accept", { method: "POST" });
     router.refresh();
+  }
+
+  async function handleDecline() {
+    setDeclining(true);
+    await signOut({ callbackUrl: "/" });
   }
 
   return (
@@ -43,19 +51,34 @@ export default function TosGate() {
           </a>{" "}
           to continue using The Kudos Library.
         </p>
-        <button
-          onClick={handleAccept}
-          disabled={accepting}
-          className="w-full rounded-sm px-4 py-2 disabled:opacity-60"
-          style={{
-            background: "var(--btn-primary-bg)",
-            color: "var(--btn-primary-text)",
-            font: "var(--text-app-ui)",
-            fontWeight: 600,
-          }}
-        >
-          {accepting ? "Saving…" : "I agree — continue"}
-        </button>
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={handleAccept}
+            disabled={accepting || declining}
+            className="w-full rounded-sm px-4 py-2 disabled:opacity-60"
+            style={{
+              background: "var(--btn-primary-bg)",
+              color: "var(--btn-primary-text)",
+              font: "var(--text-app-ui)",
+              fontWeight: 600,
+            }}
+          >
+            {accepting ? "Saving…" : PRODUCT_COPY.onboarding.tosAccept}
+          </button>
+          <button
+            onClick={handleDecline}
+            disabled={accepting || declining}
+            className="w-full rounded-sm px-4 py-2 disabled:opacity-60"
+            style={{
+              background: "transparent",
+              color: "var(--lib-parchment)",
+              font: "var(--text-app-ui)",
+              border: "1px solid var(--wood-walnut-deep)",
+            }}
+          >
+            {declining ? "Signing out…" : PRODUCT_COPY.onboarding.tosDecline}
+          </button>
+        </div>
       </div>
     </div>
   );

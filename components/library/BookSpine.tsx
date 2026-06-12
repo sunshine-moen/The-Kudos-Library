@@ -79,6 +79,7 @@ export default function BookSpine({ id, bookDesign, recipientName, messageSnippe
           boxShadow: hovered ? "2px 4px 12px rgba(0,0,0,0.25)" : "1px 2px 4px rgba(0,0,0,0.15)",
           cursor: "pointer",
           position: "relative",
+          willChange: "transform",
         }}
       >
         {/* Vertical recipient name */}
