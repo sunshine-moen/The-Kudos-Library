@@ -54,6 +54,7 @@ enum EmailTemplateType {
 enum MagicLinkTokenKind {
   login
   deep_link
+  deletion_cancel
 }
 
 enum AnniversaryKind {
@@ -70,6 +71,14 @@ enum AnniversaryLeadTime {
 enum LeaderboardKind {
   top_giver_week
   top_giver_month
+}
+
+enum TeamMeetingDay {
+  Mon
+  Tue
+  Wed
+  Thu
+  Fri
 }
 
 enum CronOutcome {
@@ -311,9 +320,20 @@ model TeamSettings {
   email_log_retention_days                 Int                 @default(90)
   leaderboard_top_n_week                   Int                 @default(5)
   leaderboard_top_n_month                  Int                 @default(5)
+  prompt_queue_low_threshold               Int                 @default(2)
   prompt_of_week_send_local_day_and_time   String              @default("wednesday 09:00")
   prompt_admin_reminder_local_day_and_time String              @default("friday 09:00")
   kudos_was_read_digest_local_day_and_time String              @default("friday 15:00")
+  edit_window_minutes                      Int                 @default(15)
+  max_kudos_per_day_per_giver              Int                 @default(30)
+  kudos_char_limit                         Int                 @default(2000)
+  context_char_limit                       Int                 @default(200)
+  context_required                         Boolean             @default(false)
+  anniversary_reminder_advance_days        Int                 @default(7)
+  audit_log_retention_days                 Int                 @default(365)
+  // v1.5 prep: per-tenant meeting-window exclusion for unprompted-giver rate metric
+  team_meeting_day                         TeamMeetingDay?
+  team_meeting_end_local_time              String?
   created_at                               DateTime            @default(now())
   updated_at                               DateTime            @updatedAt
 
@@ -330,6 +350,7 @@ model ValueTag {
   key           String
   label         String
   group_label   String   @default("")
+  color_token   String?
   is_active     Boolean  @default(true)
   display_order Int      @default(0)
   created_at    DateTime @default(now())
@@ -437,6 +458,7 @@ model FeaturedPrompt {
   pre_tag_value_id    String?   @db.Uuid
   scheduled_by        String?   @db.Uuid
   is_default_rotation Boolean   @default(false)
+  published_at        DateTime?
   created_at          DateTime  @default(now())
   updated_at          DateTime  @updatedAt
 
@@ -457,13 +479,15 @@ model Kudos {
   tenant_id            String    @db.Uuid
   recipient_id         String?   @db.Uuid
   team_recipient_id    String?   @db.Uuid
-  giver_id             String    @db.Uuid
+  giver_id             String?   @db.Uuid
   message_text         String    @db.Text
   book_design          String    @default("classic-navy")
   font_choice          String    @default("garamond")
   context_category_id  String?   @db.Uuid
   context_text         String?
   giphy_id             String?
+  gif_alt_text         String?   @db.Text
+  read_digest_sent_at  DateTime?
   featured_prompt_id   String?   @db.Uuid
   submitted_at         DateTime  @default(now())
   edit_window_expires_at DateTime
@@ -474,7 +498,7 @@ model Kudos {
   tenant           Tenant           @relation(fields: [tenant_id], references: [id])
   recipient        User?            @relation("KudosRecipient", fields: [recipient_id], references: [id])
   team_recipient   Team?            @relation("KudosTeamRecipient", fields: [team_recipient_id], references: [id])
-  giver            User             @relation("KudosGiver", fields: [giver_id], references: [id])
+  giver            User?            @relation("KudosGiver", fields: [giver_id], references: [id])
   context_category ContextCategory? @relation(fields: [context_category_id], references: [id])
   featured_prompt  FeaturedPrompt?  @relation(fields: [featured_prompt_id], references: [id])
   kudos_values     KudosValue[]

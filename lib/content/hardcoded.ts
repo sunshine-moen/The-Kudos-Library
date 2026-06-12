@@ -1,42 +1,60 @@
-// Locked: not admin-editable; cross-tenant product voice; see 15_decision_log.md
+// Locked: not admin-editable; cross-tenant product voice; see docs/content/12_content_plan.md §1
+// Witnessing-framed verb cluster: noticing / noticed / saw / watched / add to the library (never "submit," "create," or "send")
+// Editorial conventions: Canadian spellings, unspaced em-dashes, no serial commas, no exclamation marks except modal confirmation.
 
 export const PRODUCT_COPY = {
   hero: {
-    tagline: "A library of moments your team made.",
+    tagline: "A library a team builds together—one kudos at a time, growing into a history.",
     subline:
-      "Give a kudos. It becomes a book on their shelf — a permanent record the whole team can read.",
+      "Give a kudos. It becomes a book on their shelf—a permanent record the whole team can read.",
   },
 
   marketing: {
     title: "The Kudos Library",
-    tagline: "A library of moments your team made.",
+    tagline: "A library a team builds together—one kudos at a time, growing into a history.",
     whatItIs:
-      "Kudos are books. Each one lives on a shelf, waiting to be found by someone who wasn't even there. That's the point — recognition that outlasts the moment it was given.",
-    whyItMatters: [
-      "See the work your colleagues do, even when you weren't in the room.",
-      "Managers get a weekly digest of what their team accomplished.",
-      "The library is the team's memory. Quiet, honest, and always open.",
+      "The Kudos Library is where team members recognize each other in a way that celebrates the small and big moments. With each kudos, the team builds a collective library that forms its history. It's built for teams that value recognition as part of their culture—and know that taking time to notice each other's efforts leads to stronger, more resilient workplaces.",
+    howItWorks: [
+      {
+        step: "Notice.",
+        body: "Someone on your team does something good—covers for a colleague, shares what they know, shows up when it matters. You see it.",
+      },
+      {
+        step: "Add it to the library.",
+        body: "Write a short kudos on /celebrate. Pick a value, a book design, even a GIF if you want. It takes a minute.",
+      },
+      {
+        step: "It lands on their shelf.",
+        body: "Your teammate gets an email. The kudos appears as a book on their shelf, where everyone can see it. Managers receive a weekly digest of what their team noticed.",
+      },
     ],
-    cta: "Request your login link",
+    cta: "Sign in to the library",
   },
 
   teachingMoments: {
     individual: (giverFirstName: string) =>
-      `This is what ${giverFirstName} saw.`,
+      `This is what ${giverFirstName} saw. The library keeps things like this.`,
     team: (giverFirstName: string) =>
       `This is what ${giverFirstName} saw your team do. The library keeps things like this.`,
-    payItForward:
-      "When you notice something good, you can write it down too.",
+    payItForwardNoPrompt: "What did you notice this week? Add to the library →",
+    payItForwardWithPrompt: (promptText: string) =>
+      `This week we're noticing: ${promptText}. Add to the library →`,
+    weeklyNoticing: (promptText: string) =>
+      `This week we're noticing: ${promptText}`,
+  },
+
+  shelfNames: {
+    newArrivals: "New Arrivals.",
   },
 
   emails: {
     subjects: {
-      magicLink: "Your login link for The Kudos Library",
-      magicLinkNewDevice: "Confirm your device — The Kudos Library",
+      magicLink: "Your sign-in link for The Kudos Library",
+      magicLinkNewDevice: "Confirm your device—The Kudos Library",
       recipientNotify: (giverFirstName: string) =>
         `${giverFirstName} left something for you in the library`,
       managerDigest: "Your team's week in kudos",
-      managerQuietWeek: "A quiet week — and an invitation",
+      managerQuietWeek: "A quiet week—and an invitation",
       badgeMilestone: (badgeName: string) => `You earned: ${badgeName}`,
       overlookedRecipient: "Someone on your team could use some recognition",
       inactiveNudge: "The library is waiting for you",
@@ -51,11 +69,14 @@ export const PRODUCT_COPY = {
   },
 
   emptyStates: {
-    library: "No books on the shelves yet. Be the first to leave one.",
-    shelf: "No kudos on this shelf yet.",
-    badges: "No badges yet. Give a kudos to start collecting.",
-    newArrivals: "Nothing new this week — but the shelves are waiting.",
-    leaderboard: "No entries yet for this period.",
+    library: "The library is brand new. Be the first to add a kudos.",
+    libraryCta: "Add to the library",
+    shelfOther: (firstName: string) => `${firstName}'s shelf is waiting for its first book.`,
+    shelfOwn: "Your shelf is waiting for its first book.",
+    shelfTeam: (teamName: string) => `${teamName}'s shelf is waiting for its first book.`,
+    badges: "No badges yet. Add your first kudos to earn First Chapter.",
+    badgesCta: "Add to the library",
+    newArrivals: null,
   },
 
   toasts: {
@@ -72,6 +93,12 @@ export const PRODUCT_COPY = {
   },
 
   modals: {
+    kudosSubmitted: {
+      individual: (recipientFirstName: string) => `Thanks for celebrating ${recipientFirstName}!`,
+      team: (teamShortName: string) => `Thanks for celebrating ${teamShortName}!`,
+      ctaRecognizeAnother: "Recognize another teammate",
+      ctaBackToLibrary: "Back to library",
+    },
     deleteKudos: {
       title: "Remove this kudos?",
       body: "This kudos will be hidden from the library. The text is preserved in admin records.",
@@ -80,10 +107,68 @@ export const PRODUCT_COPY = {
     },
     deleteAccount: {
       title: "Delete your account?",
-      body: "Your kudos text will be kept for team history, but your name will be removed. Your badges and reading history will be deleted. You have 30 days to cancel.",
-      confirm: "Schedule deletion",
-      cancel: "Keep my account",
+      body: "Your account will enter a 30-day grace period. During that time, you can restore it from any email we send you.",
+      itemsDeleted: [
+        "Your shelf",
+        "Kudos you've given",
+        "Kudos you've received",
+        "Your badges",
+        "Your email settings",
+      ],
+      warning: "This cannot be undone.",
+      instruction:
+        "If you didn't mean to do this, close this window. Otherwise, click below to start the 30-day grace period.",
+      confirm: "Yes, start the 30-day grace period",
+      cancel: "Cancel",
     },
+  },
+
+  login: {
+    initial: {
+      heading: "Sign in to The Kudos Library",
+      body: "Type your work email and we'll send you a sign-in link.",
+      emailPlaceholder: "you@ag.ubc.ca",
+      cta: "Send me a sign-in link",
+    },
+    postSubmit: {
+      heading: "Check your email",
+      body: (emailAddress: string) =>
+        `We sent a sign-in link to ${emailAddress}. It works once and expires in 10 minutes.`,
+      hint: "Don't see it? Wait a moment, then check your spam folder. If it still hasn't arrived, you can ask for a new link in five minutes.",
+      ctaResend: "Ask for a new link",
+    },
+  },
+
+  deviceConfirmation: {
+    heading: "Confirm this device",
+    subheading: "Welcome to The Kudos Library.",
+    body: "This is the first time we've seen you sign in from this device. Click below to confirm it's you—then we'll remember this device for 90 days.",
+    caveat:
+      "If you didn't expect this, close this page. Whoever forwarded the email can't read your kudos without confirming.",
+    cta: "Yes, this is me",
+  },
+
+  editWindow: {
+    moreThanOneMinute: (minutesRemaining: number) =>
+      `Edit window: ${minutesRemaining} minutes remaining`,
+    exactlyOneMinute: "Edit window: 1 minute remaining",
+    lessThanOneMinute: "Edit window: less than a minute remaining",
+    tooltip:
+      "You can edit the message, values, context or GIF until the timer runs out. The recipient won't see the kudos until then.",
+  },
+
+  restoreAccount: {
+    heading: "Welcome back",
+    body: "Your account is restored. Your shelf, your kudos and your badges are all where you left them.",
+    cta: "Open the library",
+  },
+
+  formValidation: {
+    recipientRequired: "Pick a person or team to celebrate.",
+    selfKudosBlocked: "You can't write a kudos about yourself. Notice someone else?",
+    messageRequired: "Add a message—even a sentence or two.",
+    contextTooLong: "Context is 200 characters or fewer.",
+    submitError: "Something went wrong. Try again in a moment.",
   },
 
   onboarding: {
@@ -93,9 +178,10 @@ export const PRODUCT_COPY = {
     tosDecline: "Not now",
   },
 
-  pickupIndicator: (count: number) => {
-    if (count === 0) return "Your books are waiting to be found.";
-    if (count === 1) return "1 book has been picked up.";
-    return `${count} books have been picked up.`;
+  // Returns null when count === 0 — caller must hide the component entirely (no text renders).
+  pickupIndicator: (count: number): string | null => {
+    if (count === 0) return null;
+    if (count === 1) return "Your books are being picked up—1 time this week.";
+    return `Your books are being picked up—${count} times this week.`;
   },
 } as const;

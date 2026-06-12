@@ -1,0 +1,60 @@
+{
+  "crons": [
+    {
+      "path": "/api/webhook/cron/outbox-poller",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/webhook/cron/badge-evaluator",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/webhook/cron/anniversary-reminder",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/webhook/cron/account-deletion-processor",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/webhook/cron/dr-verify",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/webhook/cron/audit-purge",
+      "schedule": "0 2 * * 0"
+    },
+    {
+      "path": "/api/webhook/cron/leaderboard-rollover",
+      "schedule": "0 8 * * 1"
+    },
+    {
+      "path": "/api/webhook/cron/manager-digest",
+      "schedule": "0 9 * * 1"
+    },
+    {
+      "path": "/api/webhook/cron/prompt-of-week",
+      "schedule": "0 6 * * 1"
+    },
+    {
+      "path": "/api/webhook/cron/inactive-nudge",
+      "schedule": "0 10 * * 1"
+    },
+    {
+      "path": "/api/webhook/cron/overlooked-recipient",
+      "schedule": "0 11 * * 1"
+    },
+    {
+      "path": "/api/webhook/cron/top-giver-announcement",
+      "schedule": "0 12 * * 1"
+    },
+    {
+      "path": "/api/webhook/cron/kudos-was-read-digest",
+      "schedule": "0 9 * * 4"
+    },
+    {
+      "path": "/api/webhook/cron/prompt-admin-reminder",
+      "schedule": "0 9 * * 3"
+    }
+  ]
+}
