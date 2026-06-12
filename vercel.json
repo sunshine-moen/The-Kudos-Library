@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/webhook/cron/outbox-poller",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 9 * * *"
     },
     {
       "path": "/api/webhook/cron/badge-evaluator",
