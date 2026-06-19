@@ -36,7 +36,7 @@ export default async function MarketingPage() {
 
   return (
     <>
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:p-4 focus:z-50" style={{ background: "var(--lib-cream)", color: "var(--inst-navy)" }}>
+      <a href="#main-content" className="sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:p-4 focus-visible:z-50" style={{ background: "var(--lib-cream)", color: "var(--inst-navy)" }}>
         Skip to main content
       </a>
 
